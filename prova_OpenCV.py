@@ -23,6 +23,7 @@ if img is None:
 
 gaussian_test=cv.adaptiveThreshold(img,255,cv.ADAPTIVE_THRESH_GAUSSIAN_C,cv.THRESH_BINARY,11,2)
 
+
 # stampo l'immagine
 cv.imshow("Image", gaussian_test)
 cv.waitKey(0)
