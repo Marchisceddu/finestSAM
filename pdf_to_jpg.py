@@ -8,6 +8,6 @@ def convert_pdf_to_jpg(pdf_path, output_folder):
 
 if __name__ == "__main__":
     pdf_file_path = "./mappa_prova.pdf"
-    output_folder_path = "./cartella_di_output"
+    output_folder_path = "./ris"
 
     convert_pdf_to_jpg(pdf_file_path, output_folder_path)
