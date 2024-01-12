@@ -21,7 +21,7 @@ ret3,otsu_test = cv.threshold(blur,0,255,cv.THRESH_BINARY+cv.THRESH_OTSU)
 edges = cv.Canny(otsu_test,100,200)
 
 # stampo l'immagine
-cv.imwrite("./cartella_di_output/Otsu+Canny1.jpg", opening)
+cv.imwrite("./cartella_di_output/Otsu+Canny1.jpg", edges)
     
 
 

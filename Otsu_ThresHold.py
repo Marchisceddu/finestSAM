@@ -13,15 +13,7 @@ if img is None:
 blur = cv.GaussianBlur(img,(5,5),0)
 ret3,otsu_test = cv.threshold(blur,0,255,cv.THRESH_BINARY+cv.THRESH_OTSU)
 
-# stampo l'immagine
-
-# noise removal
-kernel = np.ones((2,2),np.uint8)
-opening = cv.morphologyEx(otsu_test,cv.MORPH_OPEN,kernel, iterations = 2)
-                          
-
-
-cv.imwrite("./cartella_di_output/Otsu.jpg", opening)
+cv.imwrite("./cartella_di_output/Otsu.jpg", otsu_test)
     
 
 
