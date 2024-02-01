@@ -1,0 +1,6 @@
+names:
+- a
+nc: 1
+test: ../test/images
+train: EM-Platelet/train/images
+val: EM-Platelet/valid/images
