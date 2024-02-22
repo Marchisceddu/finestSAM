@@ -1,7 +1,7 @@
 # Creazione dataset:
 * Aggiungere all'interno della cartella: [create_dataset/shp/*]() delle cartelle formattate come segue:
 
-'''
+```python
 shp/
 ├── image01/
 │   ├── image01.shp
@@ -16,7 +16,7 @@ shp/
 │   ├── 1.tif
 │   └── ...
 └── ...
-'''
+```
 
 * Eseguire il file [create_dataset/__init__.py]():
 
