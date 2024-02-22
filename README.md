@@ -18,4 +18,4 @@
     └── ...
     ```
 
-* Eseguire il file [create_dataset/__init__.py]():vquesto creerà il dataset in formato COCO all'interno della cartella [dataset/coco/]()
+* Eseguire il file [create_dataset/__init__.py](): questo creerà il dataset in formato COCO all'interno della cartella [dataset/coco/]()
