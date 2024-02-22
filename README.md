@@ -18,4 +18,5 @@
     └── ...
     ```
 
-* Eseguire il file [create_dataset/__init__.py](https://github.com/Marchisceddu/Progetto_Urbismap/blob/main/create_dataset/__init__.py): questo creerà il dataset in formato COCO all'interno della cartella [dataset/coco/](https://github.com/Marchisceddu/Progetto_Urbismap/tree/main/dataset/coco)
+* Eseguire il file [create_dataset/__init__.py](https://github.com/Marchisceddu/Progetto_Urbismap/blob/main/create_dataset/__init__.py):
+  questo creerà il dataset in formato COCO all'interno della cartella [dataset/coco/](https://github.com/Marchisceddu/Progetto_Urbismap/tree/main/dataset/coco)
