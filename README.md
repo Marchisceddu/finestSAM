@@ -2,7 +2,7 @@
 * Aggiungere all'interno della cartella: [create_dataset/shp/*]() delle cartelle formattate come segue:
 
 shp/
-\n├── image01/
+\\n├── image01/
 \\│   ├── image01.shp
 \\│   ├── #resto dei file che servono per il file shp
 \\│   ├── 0.tif
