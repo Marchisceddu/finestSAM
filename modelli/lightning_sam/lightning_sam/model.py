@@ -1,7 +1,7 @@
 import torch.nn as nn
 import torch.nn.functional as F
 from segment_anything import sam_model_registry
-from segment_anything import SamPredictor
+from segment_anything import SamPredictor, SamAutomaticMaskGenerator
 
 
 class Model(nn.Module):
@@ -54,5 +54,8 @@ class Model(nn.Module):
 
         return pred_masks, ious
 
-    def get_predictor(self):
+    def get_multi_predictor(self):
         return SamPredictor(self.model)
+    
+    def get_all_predictor(self):
+        return SamAutomaticMaskGenerator(self.model)

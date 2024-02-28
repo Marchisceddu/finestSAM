@@ -5,6 +5,7 @@ config = {
     "batch_size": 12,
     "num_workers": 4,
     "num_epochs": 20,
+    "k_fold": 5,
     "eval_interval": 2,
     "out_dir": "out/training",
     "opt": {
@@ -16,7 +17,7 @@ config = {
     },
     "model": {
         "type": 'vit_h',
-        "checkpoint": "sam_vit_h_4b8939.pth",
+        "checkpoint": "./modelli/lightning_sam/sav/sam_vit_h_4b8939.pth",
         "freeze": {
             "image_encoder": True,
             "prompt_encoder": True,
@@ -24,6 +25,9 @@ config = {
         },
     },
     "dataset": {
+        "root_dir": "./dataset/coco/images",
+        "annotation_file": "./dataset/coco/annotations.json",
+        
         "train": {
             "root_dir": "./dataset/train",
             "annotation_file": "./dataset/train.json"

@@ -7,12 +7,11 @@ INPUT_PATH = "./create_dataset/shp"
 MASKS_PATH = "./dataset/coco/masks/"
 JSON_PATH = "./dataset/coco/annotations.json"
 
-if __name__ == "__main__":
-    
+def create_dataset(mod = 1):
     # Creazione maschere binarie
     # MODALITA = 0 -> singolo file
     # MODALITA = 1 -> cartelle
-    if (MODALITA == 0):
+    if (mod == 0):
         print("Seleziona un file SHP")
         shp_file_path = get_shp_file_path()
 
@@ -51,4 +50,6 @@ if __name__ == "__main__":
     create_annotation_COCO(MASKS_PATH, JSON_PATH)
     display_image_with_annotations_COCO("./dataset/coco/images", "./dataset/coco/annotations.json")
     
-                
+
+if __name__ == "__main__":
+    create_dataset(MODALITA)

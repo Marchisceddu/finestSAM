@@ -7,6 +7,7 @@ import os
 from PIL import Image
 from tqdm import tqdm
 from PIL import Image
+from shapely.geometry import box
 
 # Definizione delle costanti
 ORIGIN_IMG_PATH = "./dataset/coco/images"
@@ -75,7 +76,7 @@ def convert_tif_to_png(file_path, output_path, file_name = -1):
 
         # Conta solo i file nella directory
         if file_name == -1:
-            file_name = len(os.listdir(output_path)) - 1
+            file_name = len(os.listdir(output_path))
         
         # Crea il percorso per il file PNG di output
         output_file_path = os.path.join(output_path, f"{file_name}.png")
@@ -129,43 +130,47 @@ def shp_to_bm(tif_file_path, shp_file_path, output_folder):
         data = src.read(1)  # Leggi il raster
 
     bar = tqdm(total = len(gdf), desc = "Creazione maschere binarie tif", position = 2, leave = False)
+    minx, miny, maxx, maxy = src.bounds
+    tif_bounds = box(minx, miny, maxx, maxy)
 
     # Creare una maschera binaria per ogni forma georeferenziata
     for idx, geom in gdf.geometry.items():
         bar.update(1)
         try:
             if geom.geom_type == 'Polygon':
-                # Creare una matrice vuota della stessa forma del raster
-                mask = np.zeros_like(data, dtype=np.uint8)
+                # Controllo se la geometria si sovrappone all'estensione dell'immagine
+                if geom.intersects(tif_bounds):
+                    # Creare una matrice vuota della stessa forma del raster
+                    mask = np.zeros_like(data, dtype=np.uint8)
 
-                # Genera una forma (geometria) per la singola forma
-                shapes = ((geom, 1),)
+                    # Genera una forma (geometria) per la singola forma
+                    shapes = ((geom, 1),)
 
-                # Creare una maschera per la forma
-                mask = features.rasterize(
-                    shapes = shapes,
-                    out = mask,
-                    fill = 1,
-                    transform = transform,
-                    all_touched = True,
-                    default_value = 0
-                )
+                    # Creare una maschera per la forma
+                    mask = features.rasterize(
+                        shapes = shapes,
+                        out = mask,
+                        fill = 1,
+                        transform = transform,
+                        all_touched = True,
+                        default_value = 0
+                    )
 
-                # Crea la cartella se non esiste
-                os.makedirs(f"{output_folder}", exist_ok = True)
+                    # Crea la cartella se non esiste
+                    os.makedirs(f"{output_folder}", exist_ok = True)
 
-                # Imposta il percorso per il file TIFF di output
-                output_tif_path = f"{output_folder}/output_mask_{idx}.tif"
+                    # Imposta il percorso per il file TIFF di output
+                    output_tif_path = f"{output_folder}/output_mask_{idx}.tif"
 
-                # Scrivi la maschera nel file TIFF
-                with rasterio.open(output_tif_path, 'w', **profile) as dst:
-                    dst.write(mask, 1)
+                    # Scrivi la maschera nel file TIFF
+                    with rasterio.open(output_tif_path, 'w', **profile) as dst:
+                        dst.write(mask, 1)
         except AttributeError:
             continue
 
 def crete_binary_mask(tif_file_path, shp_file_path):
     # Trova il nome dell'immagine a cui si riferisce
-    image_name = len(os.listdir(ORIGIN_IMG_PATH)) - 1
+    image_name = len(os.listdir(ORIGIN_IMG_PATH))
     out_tif = f"{OUT_TIF_PATH}/{image_name}"
     out_png = f"{OUT_PNG_PATH}/{image_name}"
 

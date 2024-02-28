@@ -17,6 +17,7 @@ from torch.utils.data import DataLoader
 from utils import AverageMeter
 from utils import calc_iou
 from tqdm import tqdm
+from sklearn.model_selection import KFold
 
 torch.set_float32_matmul_precision('high')
 
@@ -64,31 +65,47 @@ def train_sam(
     train_dataloader: DataLoader,
     val_dataloader: DataLoader,
 ):
-    """The SAM training loop."""
+    """
+        The SAM training loop.
 
+        Args:
+            cfg: The configuration dictionary.
+            fabric: The Fabric instance.
+            model: The model to train.
+            optimizer: The optimizer to use.
+            scheduler: The learning rate scheduler to use.
+            train_dataloader: The training DataLoader.
+            val_dataloader: The validation DataLoader.
+    """
+
+    # Definizione delle funzioni di perdita 
     focal_loss = FocalLoss()
     dice_loss = DiceLoss()
 
     for epoch in range(1, cfg.num_epochs): #aggiungere tqdm 
+        # Definizione delle variabili per calcolare il tempo
         batch_time = AverageMeter()
         data_time = AverageMeter()
         focal_losses = AverageMeter()
         dice_losses = AverageMeter()
         iou_losses = AverageMeter()
         total_losses = AverageMeter()
-        end = time.time()
+
         validated = False
 
-        for iter, data in tqdm(enumerate(train_dataloader)):
+        for iter, data in tqdm(enumerate(train_dataloader)): 
             if epoch > 1 and epoch % cfg.eval_interval == 0 and not validated:
                 validate(fabric, model, val_dataloader, epoch)
                 validated = True
 
-            data_time.update(time.time() - end)
-            images, bboxes, gt_masks = data
-            batch_size = images.size(0)
-            pred_masks, iou_predictions = model(images, bboxes)
+            data_time.update(time.time() - end) # Aggiorna il tempo impiegato per caricare i dati
+            images, bboxes, gt_masks = data # Estrae le immagini, le bounding boxes e le maschere ground truth
+            batch_size = images.size(0) # Dimensione del batch
+            pred_masks, iou_predictions = model(images, bboxes) # Ottiene le previsioni del modello
+
             print("caricato modello e predizioni") # DEBUG
+
+            # Calcolo delle perdite per ogni maschera predetta
             num_masks = sum(len(pred_mask) for pred_mask in pred_masks)
             loss_focal = torch.tensor(0., device=fabric.device)
             loss_dice = torch.tensor(0., device=fabric.device)
@@ -99,19 +116,23 @@ def train_sam(
                 loss_dice += dice_loss(pred_mask, gt_mask, num_masks)
                 loss_iou += F.mse_loss(iou_prediction, batch_iou, reduction='sum') / num_masks
 
+            # Calcolo della perdita totale
             loss_total = 20. * loss_focal + loss_dice + loss_iou
-            optimizer.zero_grad()
-            fabric.backward(loss_total)
-            optimizer.step()
-            scheduler.step()
-            batch_time.update(time.time() - end)
-            end = time.time()
 
+            optimizer.zero_grad() # Azzeramento dei gradienti
+            fabric.backward(loss_total) # Retropropagazione del gradiente attraverso la libreria Fabric
+            optimizer.step() # Aggiornamento dei pesi del modello
+            scheduler.step() # Aggiornamento del tasso di apprendimento
+            batch_time.update(time.time() - end) # Aggiornamento del tempo di batch
+            end = time.time()  # Aggiornamento del tempo di fine
+
+            # Aggiornamento delle medie delle perdite
             focal_losses.update(loss_focal.item(), batch_size)
             dice_losses.update(loss_dice.item(), batch_size)
             iou_losses.update(loss_iou.item(), batch_size)
             total_losses.update(loss_total.item(), batch_size)
 
+            # Stampa delle statistiche di addestramento
             fabric.print(f'Epoch: [{epoch}][{iter+1}/{len(train_dataloader)}]'
                          f' | Time [{batch_time.val:.3f}s ({batch_time.avg:.3f}s)]'
                          f' | Data [{data_time.val:.3f}s ({data_time.avg:.3f}s)]'
@@ -119,6 +140,33 @@ def train_sam(
                          f' | Dice Loss [{dice_losses.val:.4f} ({dice_losses.avg:.4f})]'
                          f' | IoU Loss [{iou_losses.val:.4f} ({iou_losses.avg:.4f})]'
                          f' | Total Loss [{total_losses.val:.4f} ({total_losses.avg:.4f})]')
+
+
+def train_sam_CV(
+    cfg: Box,
+    fabric: L.Fabric,
+    model: Model,
+    optimizer: _FabricOptimizer,
+    scheduler: _FabricOptimizer,
+    dataloader: DataLoader,
+):
+    # Recupera i dati originali dal DataLoader
+    original_data = dataloader.dataset
+
+    # Dividi gli indici dei dati in k fold
+    kf = KFold(n_splits=cfg.k_fold, shuffle=True)
+
+    for k, train_index, val_index in tqdm(enumerate(kf.split(original_data))):
+        # Estrai i dati di addestramento e validazione per questa iterazione
+        train_subset = torch.utils.data.Subset(original_data, train_index)
+        val_subset = torch.utils.data.Subset(original_data, val_index)
+
+        # Crea nuovi DataLoader per addestramento e validazione
+        train_loader = fabric._setup_dataloader(torch.utils.data.DataLoader(train_subset, batch_size=cfg.batch_size, shuffle=True))
+        val_loader = fabric._setup_dataloader(torch.utils.data.DataLoader(val_subset, batch_size=cfg.batch_size, shuffle=False))
+
+        # Addestra il modello utilizzando train_loader e valuta sul val_loader
+        train_sam(cfg, fabric, model, optimizer, scheduler, train_loader, val_loader)
 
 
 def configure_opt(cfg: Box, model: Model):
@@ -140,13 +188,13 @@ def configure_opt(cfg: Box, model: Model):
 
 
 def main(cfg: Box) -> None:
-    fabric = L.Fabric(accelerator="auto",
-                      devices=1,
-                      strategy="auto",
-                      loggers=[TensorBoardLogger(cfg.out_dir, name="lightning-sam")])
-    # fabric = L.Fabric(accelerator="cpu",
-    #               strategy="auto",
-    #               loggers=[TensorBoardLogger(cfg.out_dir, name="lightning-sam")])
+    # fabric = L.Fabric(accelerator="auto",
+    #                   devices=1,
+    #                   strategy="auto",
+    #                   loggers=[TensorBoardLogger(cfg.out_dir, name="lightning-sam")])
+    fabric = L.Fabric(accelerator="cpu",
+                  strategy="auto",
+                  loggers=[TensorBoardLogger(cfg.out_dir, name="lightning-sam")])
     fabric.launch()
     fabric.seed_everything(1337 + fabric.global_rank)
 
@@ -166,9 +214,13 @@ def main(cfg: Box) -> None:
     optimizer, scheduler = configure_opt(cfg, model)
     model, optimizer = fabric.setup(model, optimizer)
 
-    train_sam(cfg, fabric, model, optimizer, scheduler, train_data, val_data)
-    validate(fabric, model, val_data, epoch=0)
+    # Train a epoche
+    # train_sam(cfg, fabric, model, optimizer, scheduler, train_data, val_data)
+    # validate(fabric, model, val_data, epoch=0)
 
+    # Train con cross validation
+    # train_sam_CV(cfg, fabric, model, optimizer, scheduler, train_data)
+    # validate(fabric, model, val_data, epoch=0)
 
 if __name__ == "__main__":
     main(cfg)

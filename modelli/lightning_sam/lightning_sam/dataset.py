@@ -91,31 +91,35 @@ class ResizeAndPad:
 
 def load_datasets(cfg, img_size):
     transform = ResizeAndPad(img_size)
-    train = COCODataset(root_dir=cfg.dataset.train.root_dir,
-                        annotation_file=cfg.dataset.train.annotation_file,
-                        transform=transform)
-    
-    # # Visualize the dataset
-    image, bboxes, masks = train[0]
-    image = np.transpose(image, (1, 2, 0))
-    for i in range(len(masks)):
-        plt.figure(figsize=(8, 8))
-        plt.imshow(image)
-        plt.imshow(masks[i], alpha=0.5, cmap='jet')  # Overlay masks on the image
-        plt.axis('off')
-        plt.show()
 
-    val = COCODataset(root_dir=cfg.dataset.val.root_dir,
-                      annotation_file=cfg.dataset.val.annotation_file,
-                      transform=transform)
+    train = COCODataset(root_dir=cfg.dataset.root_dir,
+                        annotation_file=cfg.dataset.annotation_file,
+                        transform=transform)
     train_dataloader = DataLoader(train,
                                   batch_size=cfg.batch_size,
                                   shuffle=True,
                                   num_workers=cfg.num_workers,
                                   collate_fn=collate_fn)
-    val_dataloader = DataLoader(val,
-                                batch_size=cfg.batch_size,
-                                shuffle=True,
-                                num_workers=cfg.num_workers,
-                                collate_fn=collate_fn)
+    
+    # CREARE FUNZIONE PER PRENDERE IL 10/20% DEL DATASET PER LA VALIDAZIONE 
+    # val = COCODataset(root_dir=cfg.dataset.root_dir,
+    #                   annotation_file=cfg.dataset.annotation_file,
+    #                   transform=transform)
+    # val_dataloader = DataLoader(val,
+    #                             batch_size=cfg.batch_size,
+    #                             shuffle=True,
+    #                             num_workers=cfg.num_workers,
+    #                             collate_fn=collate_fn)
+    val_dataloader = DataLoader # per ora restituisce una roba vuota
+    
+    # Visualize the dataset CAMBIARE 
+    # image, bboxes, masks = train[0]
+    # image = np.transpose(image, (1, 2, 0))
+    # for i in range(len(masks)):
+    #     plt.figure(figsize=(8, 8))
+    #     plt.imshow(image)
+    #     plt.imshow(masks[i], alpha=0.5, cmap='jet')  # Overlay masks on the image
+    #     plt.axis('off')
+    #     plt.show()
+    
     return train_dataloader, val_dataloader
