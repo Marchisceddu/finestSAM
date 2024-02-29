@@ -22,6 +22,20 @@ from sklearn.model_selection import KFold
 torch.set_float32_matmul_precision('high')
 
 
+def save(
+    fabric: L.Fabric, 
+    model: Model, 
+    cfg: Box,
+    epoch: int = 0,
+    f1_scores: AverageMeter = AverageMeter(),
+):
+    fabric.print(f"Saving checkpoint to {cfg.out_dir}")
+    state_dict = model.model.state_dict()
+    if fabric.global_rank == 0:
+        torch.save(state_dict, os.path.join(cfg.out_dir, f"epoch-{epoch:06d}-f1{f1_scores.avg:.2f}-ckpt.pth"))
+    model.train()
+
+
 def validate(
     fabric: L.Fabric, 
     model: Model, 
