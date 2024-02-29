@@ -3,6 +3,6 @@ datasetV/
 create_dataset/shp/*
 create_dataset/binary_mask/masks_tif/*
 dataset/coco/masks/shape/*
-modelli/lightning_sam/sav/*
+modelli/lightning_sam/sav/*.pth
 modelli/Yolov8/pre_train/*
 modelli/Yolov8/runs/*

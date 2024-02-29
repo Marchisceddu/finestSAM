@@ -17,7 +17,7 @@ config = {
     },
     "model": {
         "type": 'vit_h',
-        "checkpoint": "../sav/sam_vit_h_4b8939.pth",
+        "checkpoint": "sav/sam_vit_h_4b8939.pth",
         "freeze": {
             "image_encoder": True,
             "prompt_encoder": True,

@@ -92,8 +92,14 @@ class ResizeAndPad:
 def load_datasets(cfg, img_size):
     transform = ResizeAndPad(img_size)
 
-    train = COCODataset(root_dir=cfg.dataset.root_dir,
-                        annotation_file=cfg.dataset.annotation_file,
+    # Ottiene il percorso del dataset
+    current_file_path = os.path.abspath(__file__)
+    current_directory = os.path.dirname(current_file_path)
+    dataset_path = os.path.join(current_directory, cfg.dataset.root_dir)
+    annotations_path = os.path.join(current_directory, cfg.dataset.annotation_file)
+
+    train = COCODataset(root_dir=dataset_path,
+                        annotation_file=annotations_path,
                         transform=transform)
     train_dataloader = DataLoader(train,
                                   batch_size=cfg.batch_size,

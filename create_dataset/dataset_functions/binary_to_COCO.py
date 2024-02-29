@@ -70,8 +70,9 @@ ORIGINAL_EXT = 'png'
 image_id = 0
 annotation_id = 0
 
-MASKS_PATH = "./dataset/coco/masks/"
-JSON_PATH = "./dataset/coco/annotations.json"
+ROOT_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MASKS_PATH = os.path.join(ROOT_PATH, "../../dataset/coco/masks/")
+JSON_PATH =  os.path.join(ROOT_PATH, "../../dataset/coco/annotations.json")
 
 def images_annotations_info(maskpath):
     """
@@ -186,6 +187,6 @@ def create_annotation_COCO(mask_path = MASKS_PATH, dest_json = JSON_PATH):
 
 if __name__ == "__main__":
     # esempio di utilizzo
-    train_mask_path = "./dataset/coco/masks/"
-    train_json_path = "./dataset/coco/annotations.json"
+    train_mask_path = os.path.join(ROOT_PATH, "../../dataset/coco/masks/")
+    train_json_path = os.path.join(ROOT_PATH, "../../dataset/coco/annotations.json")
     create_annotation_COCO(train_mask_path, train_json_path)

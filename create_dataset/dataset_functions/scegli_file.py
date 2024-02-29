@@ -12,3 +12,9 @@ def get_tif_file_path():
   root = tk.Tk()
   root.withdraw()
   return filedialog.askopenfilename(title="Seleziona un file TIF", filetypes=[("GeoTIFF", "*.tif")])
+
+def get_png_file_path():
+  """Apre una finestra di dialogo per la selezione di un file PNG e restituisce il percorso."""
+  root = tk.Tk()
+  root.withdraw()
+  return filedialog.askopenfilename(title="Seleziona un file PNG", filetypes=[("Portable Network Graphics", "*.png")])

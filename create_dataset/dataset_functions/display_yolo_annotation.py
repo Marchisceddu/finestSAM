@@ -47,6 +47,6 @@ def display_image_with_annotations_yolo(image_path, annotation_path, colors=None
     plt.show()  # Display the image with annotations
 
 # Example usage with specified image and annotation paths
-image_path = "img/yolo_dataset/train/images/image01.png"
+image_path = "img/yolo_dataset/train/images/image01.png" # AGGIUSTARE I PERCORSI
 annotation_path = "img/yolo_dataset/train/labels/image01.txt"
 display_image_with_annotations_yolo(image_path, annotation_path)

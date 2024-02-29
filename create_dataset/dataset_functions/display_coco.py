@@ -1,8 +1,6 @@
 from torchvision.datasets import CocoDetection
 from torchvision import transforms
 from PIL import Image, ImageDraw
-import matplotlib
-# matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
 import os
 
@@ -43,4 +41,4 @@ def display_image_with_annotations_COCO(images_path, annotation_path):
 
 if __name__ == "__main__":
     # esempio di utilizzo
-    display_image_with_annotations_COCO("./dataset/coco/images", "./dataset/coco/annotations.json")
+    display_image_with_annotations_COCO("./dataset/coco/images", "./dataset/coco/annotations.json") # AGGIUSTARE I PERCORSI

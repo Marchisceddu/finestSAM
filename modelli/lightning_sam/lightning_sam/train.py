@@ -22,7 +22,13 @@ from sklearn.model_selection import KFold
 torch.set_float32_matmul_precision('high')
 
 
-def validate(fabric: L.Fabric, model: Model, val_dataloader: DataLoader, epoch: int = 0):
+def validate(
+    fabric: L.Fabric, 
+    model: Model, 
+    cfg: Box,
+    val_dataloader: DataLoader, 
+    epoch: int = 0
+):
     model.eval()
     ious = AverageMeter()
     f1_scores = AverageMeter()
@@ -95,7 +101,7 @@ def train_sam(
 
         for iter, data in tqdm(enumerate(train_dataloader)): 
             if epoch > 1 and epoch % cfg.eval_interval == 0 and not validated:
-                validate(fabric, model, val_dataloader, epoch)
+                validate(fabric, model, cfg, val_dataloader, epoch)
                 validated = True
 
             data_time.update(time.time() - end) # Aggiorna il tempo impiegato per caricare i dati
@@ -188,6 +194,11 @@ def configure_opt(cfg: Box, model: Model):
 
 
 def main(cfg: Box) -> None:
+    # Ottiene il percorso della cartella di output
+    current_file_path = os.path.abspath(__file__)
+    current_directory = os.path.dirname(current_file_path)
+    cfg.out_dir = os.path.join(current_directory, cfg.out_dir)
+
     # fabric = L.Fabric(accelerator="auto",
     #                   devices=1,
     #                   strategy="auto",
@@ -216,11 +227,11 @@ def main(cfg: Box) -> None:
 
     # Train a epoche
     # train_sam(cfg, fabric, model, optimizer, scheduler, train_data, val_data)
-    # validate(fabric, model, val_data, epoch=0)
+    # validate(fabric, model, cfg, val_data, epoch=0)
 
     # Train con cross validation
     # train_sam_CV(cfg, fabric, model, optimizer, scheduler, train_data)
-    # validate(fabric, model, val_data, epoch=0)
+    # validate(fabric, model, cfg, val_data, epoch=0)
 
 if __name__ == "__main__":
     main(cfg)

@@ -144,3 +144,5 @@ if __name__ == "__main__":
         val_path="EM-Platelet/valid/images",
         test_path='../test/images'  # or None if not applicable
     )
+
+# QUESTO CODICE E DA AGGIUSTARE, NON FUNZIONA

@@ -3,9 +3,10 @@ from tqdm import tqdm
 from dataset_functions import crete_binary_mask, create_annotation_COCO, get_shp_file_path, get_tif_file_path, display_image_with_annotations_COCO
 
 MODALITA = 1 
-INPUT_PATH = "./create_dataset/shp"
-MASKS_PATH = "./dataset/coco/masks/"
-JSON_PATH = "./dataset/coco/annotations.json"
+ROOT_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+INPUT_PATH = os.path.join(ROOT_PATH, "shp")
+MASKS_PATH = os.path.join(ROOT_PATH, "../dataset/coco/masks/")
+JSON_PATH = os.path.join(ROOT_PATH, "../dataset/coco/annotations.json")
 
 def create_dataset(mod = 1):
     # Creazione maschere binarie
@@ -48,7 +49,7 @@ def create_dataset(mod = 1):
 
     # Creazione delle delle annotazioni COCO
     create_annotation_COCO(MASKS_PATH, JSON_PATH)
-    display_image_with_annotations_COCO("./dataset/coco/images", "./dataset/coco/annotations.json")
+    display_image_with_annotations_COCO("../dataset/coco/images", "../dataset/coco/annotations.json")
     
 
 if __name__ == "__main__":

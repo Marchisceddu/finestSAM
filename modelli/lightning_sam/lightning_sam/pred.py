@@ -9,8 +9,8 @@ import os
 
 '''
     esempio di come potrebbe essere, documentazione utile 
-    https://colab.research.google.com/github/facebookresearch/segment-anything/blob/main/notebooks/automatic_mask_generator_example.ipynb#scrollTo=68364513
-    https://colab.research.google.com/github/facebookresearch/segment-anything/blob/main/notebooks/predictor_example.ipynb#scrollTo=b4a4b25c
+    tutte le maschere -> https://colab.research.google.com/github/facebookresearch/segment-anything/blob/main/notebooks/automatic_mask_generator_example.ipynb#scrollTo=68364513
+    singola maschera per punto -> https://colab.research.google.com/github/facebookresearch/segment-anything/blob/main/notebooks/predictor_example.ipynb#scrollTo=b4a4b25c
 '''
 
 def show_anns(anns):
@@ -28,14 +28,10 @@ def show_anns(anns):
         img[m] = color_mask
     ax.imshow(img)
 
-def prova_pred(path):
-    # Ottieni il percorso assoluto del file che si sta eseguendo
+def pred(path):
+    # Ottiene il percorso dell'immagine
     current_file_path = os.path.abspath(__file__)
-
-    # Ottieni il percorso della directory in cui si trova il file che si sta eseguendo
     current_directory = os.path.dirname(current_file_path)
-
-    # Costruisci il percorso completo del file che desideri cercare
     image_path = os.path.join(current_directory, path)
 
     image = cv2.imread(image_path)
@@ -54,12 +50,14 @@ def prova_pred(path):
 
     # Esegue la predizione di tutte le maschere
     predictor = model.get_all_predictor()
-    masks = predictor.generate(image.to(fabric.device))
+    masks = predictor.generate(image)
 
+    # Visualizza l'immagine con le maschere
     plt.figure(figsize=(8,8))
     plt.imshow(image)
     show_anns(masks)
     plt.axis('off')
     plt.show()
 
-prova_pred('../../../dataset/coco/images/0.png')
+if __name__ == '__main__':
+    pred('../../../dataset/coco/images/0.png')
