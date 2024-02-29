@@ -65,4 +65,5 @@ class Model(nn.Module):
         return SamPredictor(self.model)
     
     def get_all_predictor(self):
-        return SamAutomaticMaskGenerator(self.model)
+        return SamAutomaticMaskGenerator(model = self.model,
+                                         min_mask_region_area=100)

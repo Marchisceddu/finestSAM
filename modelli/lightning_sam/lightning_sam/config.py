@@ -17,7 +17,7 @@ config = {
     },
     "model": {
         "type": 'vit_h',
-        "checkpoint": "sav/sam_vit_h_4b8939.pth",
+        "checkpoint": "../sav/sam_vit_h_4b8939.pth",
         "freeze": {
             "image_encoder": True,
             "prompt_encoder": True,
@@ -25,18 +25,20 @@ config = {
         },
     },
     "dataset": {
-        "root_dir": "./dataset/coco/images",
-        "annotation_file": "./dataset/coco/annotations.json",
+        "root_dir": "../../../dataset/coco/images",
+        "annotation_file": "../../../dataset/coco/annotations.json",
         
         "train": {
-            "root_dir": "./dataset/train",
-            "annotation_file": "./dataset/train.json"
+            "root_dir": "../../../dataset/train",
+            "annotation_file": "../../../dataset/train.json"
         },
         "val": {
-            "root_dir": "./dataset/val",
-            "annotation_file": "./dataset/val.json"
+            "root_dir": "../../../dataset/val",
+            "annotation_file": "../../../dataset/val.json"
         }
     }
 }
+
+# train e val in dataset vanno eliminati in teoria e sostituiti con lo split del dataset in dataset.py
 
 cfg = Box(config)
