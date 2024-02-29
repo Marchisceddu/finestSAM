@@ -96,7 +96,7 @@ def train_sam(
         dice_losses = AverageMeter()
         iou_losses = AverageMeter()
         total_losses = AverageMeter()
-
+        end = time.time()
         validated = False
 
         for iter, data in tqdm(enumerate(train_dataloader)): 
@@ -108,8 +108,6 @@ def train_sam(
             images, bboxes, gt_masks = data # Estrae le immagini, le bounding boxes e le maschere ground truth
             batch_size = images.size(0) # Dimensione del batch
             pred_masks, iou_predictions = model(images, bboxes) # Ottiene le previsioni del modello
-
-            print("caricato modello e predizioni") # DEBUG
 
             # Calcolo delle perdite per ogni maschera predetta
             num_masks = sum(len(pred_mask) for pred_mask in pred_masks)
@@ -140,12 +138,12 @@ def train_sam(
 
             # Stampa delle statistiche di addestramento
             fabric.print(f'Epoch: [{epoch}][{iter+1}/{len(train_dataloader)}]'
-                         f' | Time [{batch_time.val:.3f}s ({batch_time.avg:.3f}s)]'
-                         f' | Data [{data_time.val:.3f}s ({data_time.avg:.3f}s)]'
-                         f' | Focal Loss [{focal_losses.val:.4f} ({focal_losses.avg:.4f})]'
-                         f' | Dice Loss [{dice_losses.val:.4f} ({dice_losses.avg:.4f})]'
-                         f' | IoU Loss [{iou_losses.val:.4f} ({iou_losses.avg:.4f})]'
-                         f' | Total Loss [{total_losses.val:.4f} ({total_losses.avg:.4f})]')
+                         f' | Time [{batch_time.val:.3f}s]'
+                         f' | Data [{data_time.val:.3f}s]'
+                         f' | Focal Loss [{focal_losses.val:.4f}]'
+                         f' | Dice Loss [{dice_losses.val:.4f}]'
+                         f' | IoU Loss [{iou_losses.val:.4f}]'
+                         f' | Total Loss [{total_losses.val:.4f}]')
 
 
 def train_sam_CV(
@@ -199,11 +197,8 @@ def main(cfg: Box) -> None:
     current_directory = os.path.dirname(current_file_path)
     cfg.out_dir = os.path.join(current_directory, cfg.out_dir)
 
-    # fabric = L.Fabric(accelerator="auto",
-    #                   devices=1,
-    #                   strategy="auto",
-    #                   loggers=[TensorBoardLogger(cfg.out_dir, name="lightning-sam")])
-    fabric = L.Fabric(accelerator="cpu",
+    fabric = L.Fabric(accelerator="auto",
+                  devices=cfg.num_devices,
                   strategy="auto",
                   loggers=[TensorBoardLogger(cfg.out_dir, name="lightning-sam")])
     fabric.launch()

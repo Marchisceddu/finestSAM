@@ -38,7 +38,7 @@ def pred(path):
 
     # Carica il modello con il salvataggio presente in cfg
     fabric = L.Fabric(accelerator="auto",
-                    devices="auto",
+                    devices=cfg.num_devices,
                     strategy="auto",
                     loggers=[TensorBoardLogger(cfg.out_dir, name="lightning-sam")])
     fabric.launch()
