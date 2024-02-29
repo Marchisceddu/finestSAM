@@ -2,6 +2,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from segment_anything import sam_model_registry
 from segment_anything import SamPredictor, SamAutomaticMaskGenerator
+import os
 
 
 class Model(nn.Module):
@@ -11,7 +12,13 @@ class Model(nn.Module):
         self.cfg = cfg
 
     def setup(self):
-        self.model = sam_model_registry[self.cfg.model.type](checkpoint=self.cfg.model.checkpoint)
+        # Percorso del checkpoint
+        current_file_path = os.path.abspath(__file__)
+        current_directory = os.path.dirname(current_file_path)
+        checkpoint_path = os.path.join(current_directory, self.cfg.model.checkpoint)
+
+        # Modello
+        self.model = sam_model_registry[self.cfg.model.type](checkpoint=checkpoint_path)
         self.model.train()
         if self.cfg.model.freeze.image_encoder:
             for param in self.model.image_encoder.parameters():

@@ -5,6 +5,7 @@ from lightning.fabric.loggers import TensorBoardLogger
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 
 '''
     esempio di come potrebbe essere, documentazione utile 
@@ -28,7 +29,16 @@ def show_anns(anns):
     ax.imshow(img)
 
 def prova_pred(path):
-    image = cv2.imread(path)
+    # Ottieni il percorso assoluto del file che si sta eseguendo
+    current_file_path = os.path.abspath(__file__)
+
+    # Ottieni il percorso della directory in cui si trova il file che si sta eseguendo
+    current_directory = os.path.dirname(current_file_path)
+
+    # Costruisci il percorso completo del file che desideri cercare
+    image_path = os.path.join(current_directory, path)
+
+    image = cv2.imread(image_path)
 
     # Carica il modello con il salvataggio presente in cfg
     fabric = L.Fabric(accelerator="auto",
@@ -44,10 +54,12 @@ def prova_pred(path):
 
     # Esegue la predizione di tutte le maschere
     predictor = model.get_all_predictor()
-    masks = predictor.generate(image)
+    masks = predictor.generate(image.to(fabric.device))
 
     plt.figure(figsize=(8,8))
     plt.imshow(image)
     show_anns(masks)
     plt.axis('off')
     plt.show()
+
+prova_pred('../../../dataset/coco/images/0.png')
