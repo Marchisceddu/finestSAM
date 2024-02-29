@@ -47,6 +47,7 @@ def pred(path):
     with fabric.device:
         model = Model(cfg)
         model.setup()
+        model.to(fabric.device)
 
     # Esegue la predizione di tutte le maschere
     predictor = model.get_all_predictor()

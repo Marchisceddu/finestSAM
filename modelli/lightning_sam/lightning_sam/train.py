@@ -217,6 +217,7 @@ def main(cfg: Box) -> None:
     with fabric.device:
         model = Model(cfg)
         model.setup()
+        model.to(fabric.device)
 
     train_data, val_data = load_datasets(cfg, model.model.image_encoder.img_size)
     train_data = fabric._setup_dataloader(train_data)
