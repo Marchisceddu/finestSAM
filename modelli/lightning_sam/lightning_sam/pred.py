@@ -60,37 +60,5 @@ def pred(path):
     plt.axis('off')
     plt.show()
 
-def pred2(path):
-    # Ottiene il percorso dell'immagine
-    current_file_path = os.path.abspath(__file__)
-    current_directory = os.path.dirname(current_file_path)
-    image_path = os.path.join(current_directory, path)
-
-    image = cv2.imread(image_path)
-
-    # Carica il modello con il salvataggio presente in cfg
-    fabric = L.Fabric(accelerator="auto",
-                    devices=cfg.num_devices,
-                    strategy="auto",
-                    loggers=[TensorBoardLogger(cfg.out_dir, name="lightning-sam")])
-    fabric.launch()
-    fabric.seed_everything(1337 + fabric.global_rank)
-
-    with fabric.device:
-        model = Model(cfg)
-        model.setup()
-        model.to(fabric.device)
-
-    # Esegue la predizione di tutte le maschere
-    predictor = model.get_predictor()
-    masks, _ = predictor.predict(image)
-
-    # Visualizza l'immagine con le maschere
-    plt.figure(figsize=(8,8))
-    plt.imshow(image)
-    show_anns(masks)
-    plt.axis('off')
-    plt.show()
-
 if __name__ == '__main__':
-    pred2('../../../dataset/coco/images/0.png')
+    pred('../../../dataset/coco/images/0.png')
