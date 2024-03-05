@@ -1,8 +1,8 @@
 import torch.nn as nn
 import torch.nn.functional as F
 from segment_anything import sam_model_registry
-from segment_anything import SamPredictor, SamAutomaticMaskGenerator
-import numpy as np
+from segment_anything import SamPredictor
+import os
 
 
 class Model(nn.Module):
@@ -12,7 +12,13 @@ class Model(nn.Module):
         self.cfg = cfg
 
     def setup(self):
-        self.model = sam_model_registry[self.cfg.model.type](checkpoint=self.cfg.model.checkpoint)
+        # Percorso del checkpoint
+        current_file_path = os.path.abspath(__file__)
+        current_directory = os.path.dirname(current_file_path)
+        checkpoint_path = os.path.join(current_directory, self.cfg.model.checkpoint)
+
+        # Modello
+        self.model = sam_model_registry[self.cfg.model.type](checkpoint=checkpoint_path)
         self.model.train()
         if self.cfg.model.freeze.image_encoder:
             for param in self.model.image_encoder.parameters():
@@ -24,20 +30,14 @@ class Model(nn.Module):
             for param in self.model.mask_decoder.parameters():
                 param.requires_grad = False
 
-    def forward(self, images, bboxes=None, centers=None):
-        if not bboxes and not centers:
-            raise ValueError("Either bboxes or centers must be provided")
+    def forward(self, images, bboxes):
         _, _, H, W = images.shape
         image_embeddings = self.model.image_encoder(images)
         pred_masks = []
         ious = []
-        if not centers:
-            centers = [None] * len(bboxes)
-        if not bboxes:
-            bboxes = [None] * len(centers)
-        for embedding, bbox, center in zip(image_embeddings, bboxes, centers):
+        for embedding, bbox in zip(image_embeddings, bboxes):
             sparse_embeddings, dense_embeddings = self.model.prompt_encoder(
-                points=center,
+                points=None,
                 boxes=bbox,
                 masks=None,
             )
@@ -62,4 +62,4 @@ class Model(nn.Module):
         return pred_masks, ious
 
     def get_predictor(self):
-        return SamAutomaticMaskGenerator(self.model)
+        return SamPredictor(self.model)

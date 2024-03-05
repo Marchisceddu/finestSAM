@@ -1,4 +1,4 @@
-from model import Model
+from modelli.lightning_sam.lightning_sam.model_bbox_only import Model
 from config import cfg
 import lightning as L
 from lightning.fabric.loggers import TensorBoardLogger
@@ -50,7 +50,7 @@ def pred(path):
         model.to(fabric.device)
 
     # Esegue la predizione di tutte le maschere
-    predictor = model.get_all_predictor()
+    predictor = model.get_predictor()
     masks = predictor.generate(image)
 
     # Visualizza l'immagine con le maschere

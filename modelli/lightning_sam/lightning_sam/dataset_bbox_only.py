@@ -8,6 +8,8 @@ from pycocotools.coco import COCO
 from segment_anything.utils.transforms import ResizeLongestSide
 from torch.utils.data import DataLoader
 from torch.utils.data import Dataset
+import matplotlib.pyplot as plt
+from PIL import ImageDraw
 
 
 class COCODataset(Dataset):
@@ -35,30 +37,25 @@ class COCODataset(Dataset):
         anns = self.coco.loadAnns(ann_ids)
         bboxes = []
         masks = []
-        centers = []
 
         for ann in anns:
             x, y, w, h = ann['bbox']
             bboxes.append([x, y, x + w, y + h])
             mask = self.coco.annToMask(ann)
             masks.append(mask)
-            centers.append([[x + w / 2, y + h / 2]])
 
         if self.transform:
-            image, masks, bboxes, centers = self.transform(image, masks, np.array(bboxes), np.array(centers))
+            image, masks, bboxes = self.transform(image, masks, np.array(bboxes))
 
         bboxes = np.stack(bboxes, axis=0)
         masks = np.stack(masks, axis=0)
-        centers = np.stack(centers, axis=0)
-        labels = np.ones((len(centers), 1))
-        labels_torch = torch.as_tensor(labels, dtype=torch.int) # @TODO should increase dim?
-        return image, torch.tensor(bboxes), torch.tensor(masks).float(), (torch.tensor(centers), labels_torch)
+        return image, torch.tensor(bboxes), torch.tensor(masks).float()
 
 
 def collate_fn(batch):
-    images, bboxes, masks, centers = zip(*batch)
+    images, bboxes, masks = zip(*batch)
     images = torch.stack(images)
-    return images, bboxes, masks, centers
+    return images, bboxes, masks
 
 
 class ResizeAndPad:
@@ -68,7 +65,7 @@ class ResizeAndPad:
         self.transform = ResizeLongestSide(target_size)
         self.to_tensor = transforms.ToTensor()
 
-    def __call__(self, image, masks, bboxes, coords):
+    def __call__(self, image, masks, bboxes):
         # Resize image and masks
         og_h, og_w, _ = image.shape
         image = self.transform.apply_image(image)
@@ -89,17 +86,13 @@ class ResizeAndPad:
         bboxes = self.transform.apply_boxes(bboxes, (og_h, og_w))
         bboxes = [[bbox[0] + pad_w, bbox[1] + pad_h, bbox[2] + pad_w, bbox[3] + pad_h] for bbox in bboxes]
 
-        coords = self.transform.apply_coords(coords, (og_h, og_w))
-        coords[..., 0] += pad_w
-        coords[..., 1] += pad_h
-
-        return image, masks, bboxes, coords
+        return image, masks, bboxes
 
 
 def load_datasets(cfg, img_size):
     transform = ResizeAndPad(img_size)
 
-   # Ottiene il percorso del dataset
+    # Ottiene il percorso del dataset
     current_file_path = os.path.abspath(__file__)
     current_directory = os.path.dirname(current_file_path)
     dataset_path = os.path.join(current_directory, cfg.dataset.root_dir)
@@ -134,5 +127,5 @@ def load_datasets(cfg, img_size):
     #     plt.imshow(masks[i], alpha=0.5, cmap='jet')  # Overlay masks on the image
     #     plt.axis('off')
     #     plt.show()
-
+    
     return train_dataloader, val_dataloader
