@@ -12,7 +12,7 @@ from lightning.fabric.fabric import _FabricOptimizer
 from lightning.fabric.loggers import TensorBoardLogger
 from losses import DiceLoss
 from losses import FocalLoss
-from modelli.lightning_sam.lightning_sam.model_bbox_only import Model
+from model import Model
 from torch.utils.data import DataLoader
 from utils import AverageMeter
 from utils import calc_iou
@@ -192,7 +192,7 @@ def main(cfg: Box) -> None:
     model, optimizer = fabric.setup(model, optimizer)
 
     train_sam(cfg, fabric, model, optimizer, scheduler, train_data, val_data)
-    #validate(fabric, model, val_data, epoch=0)
+    validate(fabric, model, train_data, epoch=0)
 
 
 if __name__ == "__main__":

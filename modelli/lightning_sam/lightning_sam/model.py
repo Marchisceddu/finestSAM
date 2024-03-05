@@ -62,4 +62,4 @@ class Model(nn.Module):
         return pred_masks, ious
 
     def get_predictor(self):
-        return SamAutomaticMaskGenerator(self.model)
+        return SamPredictor(self.model)
