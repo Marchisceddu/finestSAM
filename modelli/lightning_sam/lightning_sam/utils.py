@@ -51,12 +51,18 @@ def draw_image(image, masks, boxes, labels, alpha=0.4):
 
 
 def visualize(cfg: Box):
+    current_file_path = os.path.abspath(__file__)
+    current_directory = os.path.dirname(current_file_path)
+    dataset_path = os.path.join(current_directory, cfg.dataset.root_dir)
+    annotations_path = os.path.join(current_directory, cfg.dataset.annotation_file)
+    cfg.out_dir = os.path.join(current_directory, cfg.out_dir)
+
     model = Model(cfg)
     model.setup()
     model.eval()
     model.cuda()
-    dataset = COCODataset(root_dir=cfg.dataset.val.root_dir,
-                          annotation_file=cfg.dataset.val.annotation_file,
+    dataset = COCODataset(root_dir=dataset_path,
+                          annotation_file=annotations_path,
                           transform=None)
     predictor = model.get_predictor()
     os.makedirs(cfg.out_dir, exist_ok=True)

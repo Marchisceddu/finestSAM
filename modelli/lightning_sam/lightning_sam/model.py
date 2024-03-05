@@ -32,9 +32,9 @@ class Model(nn.Module):
         pred_masks = []
         ious = []
         if not centers:
-            centers = [None] * len(bboxes)
+            centers = [None] * len(image_embeddings)
         if not bboxes:
-            bboxes = [None] * len(centers)
+            bboxes = [None] * len(image_embeddings)
         for embedding, bbox, center in zip(image_embeddings, bboxes, centers):
             sparse_embeddings, dense_embeddings = self.model.prompt_encoder(
                 points=center,
@@ -62,4 +62,4 @@ class Model(nn.Module):
         return pred_masks, ious
 
     def get_predictor(self):
-        return (self.model)
+        return SamPredictor(self.model)
