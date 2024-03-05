@@ -54,7 +54,7 @@ def visualize(cfg: Box):
     model = Model(cfg)
     model.setup()
     model.eval()
-    # model.cuda()
+    model.cuda()
     dataset = COCODataset(root_dir=cfg.dataset.val.root_dir,
                           annotation_file=cfg.dataset.val.annotation_file,
                           transform=None)

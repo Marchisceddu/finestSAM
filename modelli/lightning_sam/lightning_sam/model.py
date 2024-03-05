@@ -24,7 +24,7 @@ class Model(nn.Module):
             for param in self.model.mask_decoder.parameters():
                 param.requires_grad = False
 
-    def forward(self, images, bboxes=None, centers=None, masks=None):
+    def forward(self, images, bboxes=None, centers=None):
         if not bboxes and not centers:
             raise ValueError("Either bboxes or centers must be provided")
         _, _, H, W = images.shape
@@ -39,7 +39,7 @@ class Model(nn.Module):
             sparse_embeddings, dense_embeddings = self.model.prompt_encoder(
                 points=center,
                 boxes=bbox,
-                masks=masks,
+                masks=None,
             )
 
             low_res_masks, iou_predictions = self.model.mask_decoder(
@@ -62,4 +62,4 @@ class Model(nn.Module):
         return pred_masks, ious
 
     def get_predictor(self):
-        return SamPredictor(self.model)
+        return (self.model)
