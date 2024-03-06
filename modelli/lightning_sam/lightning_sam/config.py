@@ -25,8 +25,8 @@ config = {
         },
     },
     "dataset": {
-        "root_dir": "../../../dataset/coco/images",
-        "annotation_file": "../../../dataset/coco/annotations.json",
+        "root_dir": "../../../dataset/images",
+        "annotation_file": "../../../dataset/annotations.json",
         
         "train": {
             "root_dir": "../../../dataset/train",

@@ -123,8 +123,7 @@ if __name__ == "__main__":
     convert_to_yolo(
         input_images_path = os.path.join("../../dataset/images"),
         input_json_path = os.path.join("../../dataset/annotations.json"),
-        output_images_path = os.path.join(base_output_path, "images"),
-        output_labels_path = os.path.join(base_output_path)
+        output_labels_path = os.path.join(base_output_path, "labels"),
     )
     
     # Creating the YAML configuration file
