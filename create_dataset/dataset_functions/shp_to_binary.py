@@ -11,9 +11,9 @@ from shapely.geometry import box
 
 # Definizione dei percorsi
 ROOT_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-ORIGIN_IMG_PATH = os.path.join(ROOT_PATH, "../../dataset/coco/images")
+ORIGIN_IMG_PATH = os.path.join(ROOT_PATH, "../../dataset/images")
 OUT_TIF_PATH = os.path.join(ROOT_PATH, "../create_dataset/binary_mask/masks_tif")
-OUT_PNG_PATH = os.path.join(ROOT_PATH, "../../dataset/coco/masks/shape")
+OUT_PNG_PATH = os.path.join(ROOT_PATH, "../../dataset/masks/shape")
 
 def shp_plot(shapefile_path):
     """

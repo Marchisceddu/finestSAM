@@ -6,7 +6,7 @@ The code is based on the following folder structure for training and validation
 images and masks. You need to change the code based on your folder structure 
 or organize your data to the format below.
 
-coco/            #Primary data folder for the project
+dataset/            #Primary data folder for the project
 ├── images/
 │   ├── 0.png
 │   ├── 1.png
@@ -71,8 +71,8 @@ image_id = 0
 annotation_id = 0
 
 ROOT_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MASKS_PATH = os.path.join(ROOT_PATH, "../../dataset/coco/masks/")
-JSON_PATH =  os.path.join(ROOT_PATH, "../../dataset/coco/annotations.json")
+MASKS_PATH = os.path.join(ROOT_PATH, "../../dataset/masks/")
+JSON_PATH =  os.path.join(ROOT_PATH, "../../dataset/annotations.json")
 
 def images_annotations_info(maskpath):
     """

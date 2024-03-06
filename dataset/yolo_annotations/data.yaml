@@ -1,0 +1,6 @@
+names:
+- shape
+nc: 1
+test: ''
+train: ../../dataset/images
+val: ../../dataset/images

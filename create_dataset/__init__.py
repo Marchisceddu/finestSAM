@@ -5,8 +5,8 @@ from dataset_functions import crete_binary_mask, create_annotation_COCO, get_shp
 MODALITA = 1 
 ROOT_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 INPUT_PATH = os.path.join(ROOT_PATH, "shp")
-MASKS_PATH = os.path.join(ROOT_PATH, "../dataset/coco/masks/")
-JSON_PATH = os.path.join(ROOT_PATH, "../dataset/coco/annotations.json")
+MASKS_PATH = os.path.join(ROOT_PATH, "../dataset/masks/")
+JSON_PATH = os.path.join(ROOT_PATH, "../dataset/annotations.json")
 
 def create_dataset(mod = 1):
     # Creazione maschere binarie
@@ -49,7 +49,7 @@ def create_dataset(mod = 1):
 
     # Creazione delle delle annotazioni COCO
     create_annotation_COCO(MASKS_PATH, JSON_PATH)
-    display_image_with_annotations_COCO("../dataset/coco/images", "../dataset/coco/annotations.json")
+    display_image_with_annotations_COCO("../dataset/images", "../dataset/annotations.json")
     
 
 if __name__ == "__main__":

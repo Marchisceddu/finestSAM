@@ -41,4 +41,4 @@ def display_image_with_annotations_COCO(images_path, annotation_path):
 
 if __name__ == "__main__":
     # esempio di utilizzo
-    display_image_with_annotations_COCO("./dataset/coco/images", "./dataset/coco/annotations.json") # AGGIUSTARE I PERCORSI
+    display_image_with_annotations_COCO("./dataset/images", "./dataset/annotations.json") # AGGIUSTARE I PERCORSI
