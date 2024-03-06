@@ -47,7 +47,7 @@ import shutil
 import yaml
 
 # Function to convert images to YOLO format
-def convert_to_yolo(input_images_path, input_json_path, output_labels_path):
+def convert_to_yolo(input_images_path, input_json_path, output_images_path, output_labels_path):
     # Open JSON file containing image annotations
     f = open(input_json_path)
     data = json.load(f)
@@ -55,9 +55,16 @@ def convert_to_yolo(input_images_path, input_json_path, output_labels_path):
 
     # Create directories for output images and labels
     os.makedirs(output_labels_path, exist_ok=True)
+    os.makedirs(output_images_path, exist_ok=True)
 
     # List to store filenames
-    file_names = [filename for filename in os.listdir(input_images_path) if filename.endswith(".png")]
+    file_names = []
+    for filename in os.listdir(input_images_path):
+        if filename.endswith(".png"):
+            source = os.path.join(input_images_path, filename)
+            destination = os.path.join(output_images_path, filename)
+            shutil.copy(source, destination)
+            file_names.append(filename)
 
     # Function to get image annotations
     def get_img_ann(image_id):
@@ -97,11 +104,11 @@ def create_yaml(input_json_path, output_yaml_path, train_path, val_path, test_pa
 
     # Create a dictionary with the required content
     yaml_data = {
-        'names': names,
-        'nc': nc,
         'test': test_path if test_path else '',
         'train': train_path,
-        'val': val_path
+        'val': val_path,
+        'nc': nc,
+        'names': names
     }
 
     # Write the dictionary to a YAML file
@@ -110,12 +117,13 @@ def create_yaml(input_json_path, output_yaml_path, train_path, val_path, test_pa
 
 
 if __name__ == "__main__":
-    base_output_path = "../../dataset/yolo_annotations"
+    base_output_path = "../../dataset/yolo"
 
     # Processing dataset 
     convert_to_yolo(
         input_images_path = os.path.join("../../dataset/images"),
         input_json_path = os.path.join("../../dataset/annotations.json"),
+        output_images_path = os.path.join(base_output_path, "images"),
         output_labels_path = os.path.join(base_output_path)
     )
     
@@ -123,7 +131,7 @@ if __name__ == "__main__":
     create_yaml(
         input_json_path = os.path.join("../../dataset/annotations.json"),
         output_yaml_path = os.path.join(base_output_path, "data.yaml"),
-        train_path = "../../dataset/images",
-        val_path = "../../dataset/images", 
+        train_path = "images",
+        val_path = "images", 
         test_path = None  # or None if not applicable
     )
