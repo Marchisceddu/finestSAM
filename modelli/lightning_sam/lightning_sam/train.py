@@ -101,7 +101,7 @@ def train_sam(
             data_time.update(time.time() - end)
             images, bboxes, gt_masks, centers = data
             batch_size = images.size(0)
-            pred_masks, iou_predictions = model(images, bboxes=bboxes, centers=centers)
+            pred_masks, iou_predictions = model(images, bboxes=bboxes, centers=centers, masks=(gt_masks[0].unsqueeze(1), None))
             num_masks = sum(len(pred_mask) for pred_mask in pred_masks)
 
             loss_focal = torch.tensor(0., device=fabric.device)
