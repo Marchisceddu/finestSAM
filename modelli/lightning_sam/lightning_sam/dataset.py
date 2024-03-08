@@ -23,8 +23,48 @@ class COCODataset(Dataset):
 
     def __len__(self):
         return len(self.image_ids)
-
+    
     def __getitem__(self, idx):
+        # Restor the image from the folder
+        image_id = self.image_ids[idx]
+        image_info = self.coco.loadImgs(image_id)[0]
+        image_path = os.path.join(self.root_dir, image_info['file_name'])
+        image = cv2.imread(image_path)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+        # Get original size of the image
+        _, _, H, W = image.shape
+        original_size = (H, W)
+
+        ann_ids = self.coco.getAnnIds(imgIds=image_id)
+        anns = self.coco.loadAnns(ann_ids)
+        boxes = []
+        point_coords = []
+        masks = []
+
+        # Get box, point and mask for any annotations
+        for ann in anns:
+            x, y, w, h = ann['bbox']
+            boxes.append([x, y, x + w, y + h])
+            point_coords.append([[x + w / 2, y + h / 2]])
+            mask = self.coco.annToMask(ann)
+            masks.append(mask)
+
+        if self.transform:
+            image, masks, boxes, point_coords = self.transform(image, masks, np.array(boxes), np.array(point_coords))
+
+        # Create the labels for the points
+        point_labels = np.ones((len(point_coords), 1))
+
+        # Convert the data to tensor
+        bboxes = torch.tensor(np.stack(bboxes, axis=0))
+        masks = torch.tensor(np.stack(masks, axis=0)).float()
+        point_coords = torch.tensor(np.stack(point_coords, axis=0))
+        point_labels = torch.as_tensor(point_labels, dtype=torch.int)
+        
+        return image, original_size, point_coords, point_labels, boxes, masks
+
+    def __getitem__2(self, idx):
         image_id = self.image_ids[idx]
         image_info = self.coco.loadImgs(image_id)[0]
         image_path = os.path.join(self.root_dir, image_info['file_name'])
@@ -56,9 +96,9 @@ class COCODataset(Dataset):
 
 
 def collate_fn(batch):
-    images, bboxes, masks, centers = zip(*batch)
+    images, bboxes, masks, point_coords = zip(*batch)
     images = torch.stack(images)
-    return images, bboxes, masks, centers
+    return images, bboxes, masks, point_coords
 
 
 class ResizeAndPad:
@@ -68,7 +108,7 @@ class ResizeAndPad:
         self.transform = ResizeLongestSide(target_size)
         self.to_tensor = transforms.ToTensor()
 
-    def __call__(self, image, masks, bboxes, coords):
+    def __call__(self, image, masks, bboxes, point_coords):
         # Resize image and masks
         og_h, og_w, _ = image.shape
         image = self.transform.apply_image(image)
@@ -89,11 +129,11 @@ class ResizeAndPad:
         bboxes = self.transform.apply_boxes(bboxes, (og_h, og_w))
         bboxes = [[bbox[0] + pad_w, bbox[1] + pad_h, bbox[2] + pad_w, bbox[3] + pad_h] for bbox in bboxes]
 
-        coords = self.transform.apply_coords(coords, (og_h, og_w))
-        coords[..., 0] += pad_w
-        coords[..., 1] += pad_h
+        point_coords = self.transform.apply_coords(point_coords, (og_h, og_w))
+        point_coords[..., 0] += pad_w
+        point_coords[..., 1] += pad_h
 
-        return image, masks, bboxes, coords
+        return image, masks, bboxes, point_coords
 
 
 def load_datasets(cfg, img_size):

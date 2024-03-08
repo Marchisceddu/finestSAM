@@ -24,7 +24,7 @@ class Model(nn.Module):
             for param in self.model.mask_decoder.parameters():
                 param.requires_grad = False
 
-    def forward(self, images, bboxes=None, centers=None):
+    def forward2(self, images, bboxes=None, centers=None):
         if not bboxes and not centers:
             raise ValueError("Either bboxes or centers must be provided")
         _, _, H, W = images.shape
