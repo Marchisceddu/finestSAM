@@ -24,6 +24,11 @@ class Model(nn.Module):
             for param in self.model.mask_decoder.parameters():
                 param.requires_grad = False
 
+
+    def forward(self, batched_input, multimasks_output):
+        return self.model(batched_input, multimasks_output)
+  
+
     def forward2(self, images, bboxes=None, centers=None):
         if not bboxes and not centers:
             raise ValueError("Either bboxes or centers must be provided")
@@ -62,4 +67,4 @@ class Model(nn.Module):
         return pred_masks, ious
 
     def get_predictor(self):
-        return SamPredictor(self.model)
+        return SamAutomaticMaskGenerator(self.model)

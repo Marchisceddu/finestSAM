@@ -33,7 +33,7 @@ class COCODataset(Dataset):
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
         # Get original size of the image
-        _, _, H, W = image.shape
+        H, W, _ = image.shape
         original_size = (H, W)
 
         ann_ids = self.coco.getAnnIds(imgIds=image_id)
@@ -57,7 +57,7 @@ class COCODataset(Dataset):
         point_labels = np.ones((len(point_coords), 1))
 
         # Convert the data to tensor
-        bboxes = torch.tensor(np.stack(bboxes, axis=0))
+        boxes = torch.tensor(np.stack(boxes, axis=0))
         masks = torch.tensor(np.stack(masks, axis=0)).float()
         point_coords = torch.tensor(np.stack(point_coords, axis=0))
         point_labels = torch.as_tensor(point_labels, dtype=torch.int)
@@ -96,9 +96,19 @@ class COCODataset(Dataset):
 
 
 def collate_fn(batch):
-    images, bboxes, masks, point_coords = zip(*batch)
-    images = torch.stack(images)
-    return images, bboxes, masks, point_coords
+    image, original_size, point_coords, point_labels, boxes, masks = zip(*batch)
+
+    image_dic = {"image": image}
+    original_size_dic = {"original_size": original_size}
+    point_coords_dic = {"point_coords": point_coords}
+    point_labels_dic = {"point_labels": point_labels}
+    boxes_dic = {"boxes": boxes}
+    masks_dic = {"mask_inputs": masks}
+    
+    # Create batched_input
+    batched_input = [image_dic, original_size_dic, point_coords_dic, point_labels_dic, boxes_dic, masks_dic]
+
+    return batched_input
 
 
 class ResizeAndPad:
