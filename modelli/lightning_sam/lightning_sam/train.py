@@ -100,13 +100,21 @@ def train_sam(
 
             data_time.update(time.time() - end)
             batch_size = data["image"].size(0)
-            pred_masks, iou_predictions, _ = model(batched_input=data, multimasks_output=False)
+            outputs = model(batched_input=data, multimasks_output=False)
+
+            pred_masks = []
+            iou_predictions = []
+            for item in outputs:
+                pred_masks.append(item["masks"])
+                iou_predictions = item["iou_predictions"]
+
             num_masks = sum(len(pred_mask) for pred_mask in pred_masks)
 
             loss_focal = torch.tensor(0., device=fabric.device)
             loss_dice = torch.tensor(0., device=fabric.device)
             loss_iou = torch.tensor(0., device=fabric.device)
-            for pred_mask, gt_mask, iou_prediction in zip(pred_masks, data["mask_inputs"], iou_predictions):
+            for pred_mask, single_data, iou_prediction in zip(pred_masks, data, iou_predictions):
+                gt_mask = single_data["mask_inputs"]
                 batch_iou = calc_iou(pred_mask, gt_mask)
                 loss_focal += focal_loss(pred_mask, gt_mask)
                 loss_dice += dice_loss(pred_mask, gt_mask)

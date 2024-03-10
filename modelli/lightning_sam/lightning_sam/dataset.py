@@ -58,57 +58,28 @@ class COCODataset(Dataset):
 
         # Convert the data to tensor
         boxes = torch.tensor(np.stack(boxes, axis=0))
-        masks = torch.tensor(np.stack(masks, axis=0)).float()
+        masks = torch.tensor(np.stack(masks, axis=0)).float().to(torch.float64)
         point_coords = torch.tensor(np.stack(point_coords, axis=0))
         point_labels = torch.as_tensor(point_labels, dtype=torch.int)
+
+        masks = masks.unsqueeze(1)
         
         return image, original_size, point_coords, point_labels, boxes, masks
-
-    def __getitem__2(self, idx):
-        image_id = self.image_ids[idx]
-        image_info = self.coco.loadImgs(image_id)[0]
-        image_path = os.path.join(self.root_dir, image_info['file_name'])
-        image = cv2.imread(image_path)
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
-        ann_ids = self.coco.getAnnIds(imgIds=image_id)
-        anns = self.coco.loadAnns(ann_ids)
-        bboxes = []
-        masks = []
-        centers = []
-
-        for ann in anns:
-            x, y, w, h = ann['bbox']
-            bboxes.append([x, y, x + w, y + h])
-            mask = self.coco.annToMask(ann)
-            masks.append(mask)
-            centers.append([[x + w / 2, y + h / 2]])
-
-        if self.transform:
-            image, masks, bboxes, centers = self.transform(image, masks, np.array(bboxes), np.array(centers))
-
-        bboxes = np.stack(bboxes, axis=0)
-        masks = np.stack(masks, axis=0)
-        centers = np.stack(centers, axis=0)
-        labels = np.ones((len(centers), 1))
-        labels_torch = torch.as_tensor(labels, dtype=torch.int) # @TODO should increase dim?
-        return image, torch.tensor(bboxes), torch.tensor(masks).float(), (torch.tensor(centers), labels_torch)
 
 
 def collate_fn(batch):
     image, original_size, point_coords, point_labels, boxes, masks = zip(*batch)
 
-    image_dic = {"image": image}
-    original_size_dic = {"original_size": original_size}
-    point_coords_dic = {"point_coords": point_coords}
-    point_labels_dic = {"point_labels": point_labels}
-    boxes_dic = {"boxes": boxes}
-    masks_dic = {"mask_inputs": masks}
-    
-    # Create batched_input
-    batched_input = [image_dic, original_size_dic, point_coords_dic, point_labels_dic, boxes_dic, masks_dic]
+    batched_input = {
+        "image": image[0],
+        "original_size": original_size[0],
+        "point_coords": point_coords[0],
+        "point_labels": point_labels[0],
+        "boxes": boxes[0],
+        "mask_inputs": masks[0]
+    }
 
-    return batched_input
+    return [batched_input]
 
 
 class ResizeAndPad:
@@ -125,6 +96,13 @@ class ResizeAndPad:
         masks = [torch.tensor(self.transform.apply_image(mask)) for mask in masks]
         image = self.to_tensor(image)
 
+        # Resize masks to 1/4th resolution of the image 
+        # SAM RICHIEDE DELLE MASCHERE 4X RISOLUZIONE INFERIORE DELLE IMMAGINI, PERO LE NOSTRE LOSS FUNCTION SONO FATTE PER DELLE MASCHERE DI RISOLUZIONE UGUALE, CAPIRE SE SONO DA CAMBIARE E SE SI COME CAMBIARLE
+        resized_masks = []
+        for mask in masks:
+            resized_mask = transforms.Resize((mask.shape[0] // 4, mask.shape[1] // 4))(mask)
+            resized_masks.append(resized_mask)
+
         # Pad image and masks to form a square
         _, h, w = image.shape
         max_dim = max(w, h)
@@ -133,7 +111,7 @@ class ResizeAndPad:
 
         padding = (pad_w, pad_h, max_dim - w - pad_w, max_dim - h - pad_h)
         image = transforms.Pad(padding)(image)
-        masks = [transforms.Pad(padding)(mask) for mask in masks]
+        resized_masks = [transforms.Pad(padding)(mask) for mask in resized_masks]
 
         # Adjust bounding boxes
         bboxes = self.transform.apply_boxes(bboxes, (og_h, og_w))
@@ -143,7 +121,7 @@ class ResizeAndPad:
         point_coords[..., 0] += pad_w
         point_coords[..., 1] += pad_h
 
-        return image, masks, bboxes, point_coords
+        return image, resized_masks, bboxes, point_coords
 
 
 def load_datasets(cfg, img_size):
