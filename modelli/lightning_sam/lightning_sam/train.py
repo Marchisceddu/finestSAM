@@ -99,7 +99,7 @@ def train_sam(
                 validated = True
 
             data_time.update(time.time() - end)
-            batch_size = data["image"].size(0)
+            #batch_size = data["image"].size(0)
             outputs = model(batched_input=data, multimasks_output=False)
 
             pred_masks = []
@@ -130,10 +130,14 @@ def train_sam(
             batch_time.update(time.time() - end)
             end = time.time()
 
-            focal_losses.update(loss_focal.item(), batch_size)
-            dice_losses.update(loss_dice.item(), batch_size)
-            iou_losses.update(loss_iou.item(), batch_size)
-            total_losses.update(loss_total.item(), batch_size)
+            # focal_losses.update(loss_focal.item(), batch_size)
+            # dice_losses.update(loss_dice.item(), batch_size)
+            # iou_losses.update(loss_iou.item(), batch_size)
+            # total_losses.update(loss_total.item(), batch_size)
+            focal_losses.update(loss_focal.item())
+            dice_losses.update(loss_dice.item())
+            iou_losses.update(loss_iou.item())
+            total_losses.update(loss_total.item())
 
             fabric.print(f'Epoch: [{epoch}][{iter+1}/{len(train_dataloader)}]'
                          f' | Time [{batch_time.val:.3f}s ({batch_time.avg:.3f}s)]'

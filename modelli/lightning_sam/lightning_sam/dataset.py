@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 import torch
 import torchvision.transforms as transforms
+import torch.nn.functional as F
 from pycocotools.coco import COCO
 from segment_anything.utils.transforms import ResizeLongestSide
 from torch.utils.data import DataLoader
@@ -89,7 +90,7 @@ class ResizeAndPad:
         self.transform = ResizeLongestSide(target_size)
         self.to_tensor = transforms.ToTensor()
 
-    def __call__(self, image, masks, bboxes, point_coords):
+    def __call__(self, image, masks, boxes, point_coords):
         # Resize image and masks
         og_h, og_w, _ = image.shape
         image = self.transform.apply_image(image)
@@ -100,28 +101,34 @@ class ResizeAndPad:
         # SAM RICHIEDE DELLE MASCHERE 4X RISOLUZIONE INFERIORE DELLE IMMAGINI, PERO LE NOSTRE LOSS FUNCTION SONO FATTE PER DELLE MASCHERE DI RISOLUZIONE UGUALE, CAPIRE SE SONO DA CAMBIARE E SE SI COME CAMBIARLE
         resized_masks = []
         for mask in masks:
-            resized_mask = transforms.Resize((mask.shape[0] // 4, mask.shape[1] // 4))(mask)
+            resized_mask = F.max_pool2d(mask.unsqueeze(0).unsqueeze(0), kernel_size=4, stride=4).squeeze()
             resized_masks.append(resized_mask)
 
-        # Pad image and masks to form a square
+        # Pad image to form a square
         _, h, w = image.shape
         max_dim = max(w, h)
         pad_w = (max_dim - w) // 2
         pad_h = (max_dim - h) // 2
-
         padding = (pad_w, pad_h, max_dim - w - pad_w, max_dim - h - pad_h)
         image = transforms.Pad(padding)(image)
+
+        # Pad masks to form a square
+        h, w = masks[0].shape
+        max_dim = max(w, h)
+        pad_w = (max_dim - w) // 2
+        pad_h = (max_dim - h) // 2
+        padding = (pad_w, pad_h, max_dim - w - pad_w, max_dim - h - pad_h)
         resized_masks = [transforms.Pad(padding)(mask) for mask in resized_masks]
 
         # Adjust bounding boxes
-        bboxes = self.transform.apply_boxes(bboxes, (og_h, og_w))
-        bboxes = [[bbox[0] + pad_w, bbox[1] + pad_h, bbox[2] + pad_w, bbox[3] + pad_h] for bbox in bboxes]
+        boxes = self.transform.apply_boxes(boxes, (og_h, og_w))
+        boxes = [[box[0] + pad_w, box[1] + pad_h, box[2] + pad_w, box[3] + pad_h] for box in boxes]
 
         point_coords = self.transform.apply_coords(point_coords, (og_h, og_w))
         point_coords[..., 0] += pad_w
         point_coords[..., 1] += pad_h
 
-        return image, resized_masks, bboxes, point_coords
+        return image, resized_masks, boxes, point_coords
 
 
 def load_datasets(cfg, img_size):
