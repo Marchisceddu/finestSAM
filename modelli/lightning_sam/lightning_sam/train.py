@@ -16,6 +16,8 @@ from model import Model
 from torch.utils.data import DataLoader
 from utils import AverageMeter
 from utils import calc_iou
+from pred import show_anns
+import matplotlib.pyplot as plt
 
 torch.set_float32_matmul_precision('high')
 
@@ -114,7 +116,12 @@ def train_sam(
             loss_dice = torch.tensor(0., device=fabric.device)
             loss_iou = torch.tensor(0., device=fabric.device)
             for pred_mask, single_data, iou_prediction in zip(pred_masks, data, iou_predictions):
-                gt_mask = single_data["mask_inputs"]
+                gt_mask = F.interpolate(single_data["mask_inputs"], single_data["original_size"], mode="bilinear", align_corners=False)
+                plt.figure(figsize=(8,8))
+                plt.imshow(single_data["imo"])
+                show_anns(gt_mask)
+                plt.axis('off')
+                plt.show()
                 batch_iou = calc_iou(pred_mask, gt_mask)
                 loss_focal += focal_loss(pred_mask, gt_mask)
                 loss_dice += dice_loss(pred_mask, gt_mask)

@@ -9,6 +9,7 @@ from pycocotools.coco import COCO
 from segment_anything.utils.transforms import ResizeLongestSide
 from torch.utils.data import DataLoader
 from torch.utils.data import Dataset
+import torch.nn as nn
 
 
 class COCODataset(Dataset):
@@ -32,6 +33,7 @@ class COCODataset(Dataset):
         image_path = os.path.join(self.root_dir, image_info['file_name'])
         image = cv2.imread(image_path)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        imo = image.copy()
 
         # Get original size of the image
         H, W, _ = image.shape
@@ -59,17 +61,17 @@ class COCODataset(Dataset):
 
         # Convert the data to tensor
         boxes = torch.tensor(np.stack(boxes, axis=0))
-        masks = torch.tensor(np.stack(masks, axis=0)).float().to(torch.float64)
+        masks = torch.tensor(np.stack(masks, axis=0)).float()
         point_coords = torch.tensor(np.stack(point_coords, axis=0))
         point_labels = torch.as_tensor(point_labels, dtype=torch.int)
 
         masks = masks.unsqueeze(1)
         
-        return image, original_size, point_coords, point_labels, boxes, masks
+        return image, original_size, point_coords, point_labels, boxes, masks, imo
 
 
 def collate_fn(batch):
-    image, original_size, point_coords, point_labels, boxes, masks = zip(*batch)
+    image, original_size, point_coords, point_labels, boxes, masks, imo = zip(*batch)
 
     batched_input = {
         "image": image[0],
@@ -77,7 +79,8 @@ def collate_fn(batch):
         "point_coords": point_coords[0],
         "point_labels": point_labels[0],
         "boxes": boxes[0],
-        "mask_inputs": masks[0]
+        "mask_inputs": masks[0],
+        "imo": imo[0]
     }
 
     return [batched_input]
@@ -101,8 +104,8 @@ class ResizeAndPad:
         # SAM RICHIEDE DELLE MASCHERE 4X RISOLUZIONE INFERIORE DELLE IMMAGINI, PERO LE NOSTRE LOSS FUNCTION SONO FATTE PER DELLE MASCHERE DI RISOLUZIONE UGUALE, CAPIRE SE SONO DA CAMBIARE E SE SI COME CAMBIARLE
         resized_masks = []
         for mask in masks:
-            resized_mask = F.max_pool2d(mask.unsqueeze(0).unsqueeze(0), kernel_size=4, stride=4).squeeze()
-            resized_masks.append(resized_mask)
+            mask = F.max_pool2d(mask.unsqueeze(0).unsqueeze(0), kernel_size=4, stride=4).squeeze()
+            resized_masks.append(mask)
 
         # Pad image to form a square
         _, h, w = image.shape
@@ -113,7 +116,7 @@ class ResizeAndPad:
         image = transforms.Pad(padding)(image)
 
         # Pad masks to form a square
-        h, w = masks[0].shape
+        h, w = resized_masks[0].shape
         max_dim = max(w, h)
         pad_w = (max_dim - w) // 2
         pad_h = (max_dim - h) // 2
