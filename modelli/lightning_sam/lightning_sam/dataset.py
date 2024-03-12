@@ -108,28 +108,28 @@ class ResizeAndPad:
             resized_masks.append(mask)
 
         # Pad image to form a square
-        _, h, w = image.shape
-        max_dim = max(w, h)
-        pad_w = (max_dim - w) // 2
-        pad_h = (max_dim - h) // 2
-        padding = (pad_w, pad_h, max_dim - w - pad_w, max_dim - h - pad_h)
-        image = transforms.Pad(padding)(image)
+        # _, h, w = image.shape
+        # max_dim = max(w, h)
+        # pad_w = (max_dim - w) // 2
+        # pad_h = (max_dim - h) // 2
+        # padding = (pad_w, pad_h, max_dim - w - pad_w, max_dim - h - pad_h)
+        # image = transforms.Pad(padding)(image)
 
         # Pad masks to form a square
-        h, w = resized_masks[0].shape
-        max_dim = max(w, h)
-        pad_w = (max_dim - w) // 2
-        pad_h = (max_dim - h) // 2
-        padding = (pad_w, pad_h, max_dim - w - pad_w, max_dim - h - pad_h)
-        resized_masks = [transforms.Pad(padding)(mask) for mask in resized_masks]
+        # h, w = resized_masks[0].shape
+        # max_dim = max(w, h)
+        # pad_w = (max_dim - w) // 2
+        # pad_h = (max_dim - h) // 2
+        # padding = (pad_w, pad_h, max_dim - w - pad_w, max_dim - h - pad_h)
+        # resized_masks = [transforms.Pad(padding)(mask) for mask in resized_masks]
 
         # Adjust bounding boxes
         boxes = self.transform.apply_boxes(boxes, (og_h, og_w))
-        boxes = [[box[0] + pad_w, box[1] + pad_h, box[2] + pad_w, box[3] + pad_h] for box in boxes]
+        #boxes = [[box[0] + pad_w, box[1] + pad_h, box[2] + pad_w, box[3] + pad_h] for box in boxes]
 
         point_coords = self.transform.apply_coords(point_coords, (og_h, og_w))
-        point_coords[..., 0] += pad_w
-        point_coords[..., 1] += pad_h
+        # point_coords[..., 0] += pad_w
+        # point_coords[..., 1] += pad_h
 
         return image, resized_masks, boxes, point_coords
 
