@@ -17,6 +17,8 @@ from torch.utils.data import DataLoader
 from utils import AverageMeter
 from utils import calc_iou
 import matplotlib.pyplot as plt
+import cv2
+import numpy as np
 
 torch.set_float32_matmul_precision('high')
 
