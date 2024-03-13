@@ -109,7 +109,7 @@ def train_sam(
             iou_predictions = []
             for item in outputs:
                 pred_masks.append(item["masks"])
-                iou_predictions = item["iou_predictions"]
+                iou_predictions.append(item["iou_predictions"])
 
             num_masks = sum(len(pred_mask) for pred_mask in pred_masks)
 
@@ -118,6 +118,7 @@ def train_sam(
             loss_iou = torch.tensor(0., device=fabric.device)
             for pred_mask, single_data, iou_prediction in zip(pred_masks, data, iou_predictions):
                 gt_mask = F.interpolate(single_data["mask_inputs"], single_data["original_size"], mode="bilinear", align_corners=False)
+                gt_mask = (gt_mask >= 0.5).float()
 
                 # single_frame = single_data["imo"]
                 # annotation_rgb = np.zeros_like(single_frame)

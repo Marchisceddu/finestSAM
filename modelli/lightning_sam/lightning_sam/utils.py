@@ -36,9 +36,7 @@ def calc_iou(pred_mask: torch.Tensor, gt_mask: torch.Tensor):
     union = torch.sum(pred_mask, dim=(2,3)) + torch.sum(gt_mask, dim=(2, 3)) - intersection
     epsilon = 1e-7
     batch_iou = intersection / (union + epsilon)
-    print(batch_iou.shape)
-    batch_iou = batch_iou.unsqueeze(1)
-    print(batch_iou.shape)
+
     return batch_iou
 
 def draw_image(image, masks, boxes, labels, alpha=0.4):
