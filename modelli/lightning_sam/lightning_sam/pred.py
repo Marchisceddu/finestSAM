@@ -61,4 +61,4 @@ def pred(path):
     plt.show()
 
 if __name__ == '__main__':
-    pred('../../../dataset/coco/images/0.png')
+    pred('../../../dataset/images/0.png')
