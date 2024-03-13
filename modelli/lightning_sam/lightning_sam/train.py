@@ -124,9 +124,10 @@ def train_sam(
                 gt_mask = F.interpolate(single_data["mask_inputs"], single_data["original_size"], mode="bilinear", align_corners=False)
                 gt_mask = (gt_mask >= 0.5).float()
 
+                # stamp = pred_mask[2] > 0.0 # elimina il gradiente dalla maschera predetta e trasforma in bool per essere stampata
                 # single_frame = single_data["imo"]
                 # annotation_rgb = np.zeros_like(single_frame)
-                # annotation_rgb[pred_mask[2].squeeze().cpu().numpy()] = [1, 255, 255] 
+                # annotation_rgb[stamp.squeeze().cpu().numpy()] = [1, 255, 255] 
 
                 # annotation = gt_mask[2].squeeze().cpu().numpy() * 255
                 # annotation_rgb = np.repeat(annotation[..., np.newaxis], 3, axis=2).astype(np.uint8)
@@ -139,10 +140,14 @@ def train_sam(
                 loss_focal += focal_loss(pred_mask, gt_mask)
                 loss_dice += dice_loss(pred_mask, gt_mask)
                 loss_iou += F.mse_loss(iou_prediction, batch_iou, reduction='sum') / num_masks
-                loss = seg_loss(pred_mask, gt_mask) + ce_loss(pred_mask, gt_mask)
+                # sicuro con il gradiente delle maschere adesso funzionano anche queste, in caso ora si possono cambiare e il train non si bassa più su iou_prediction
+
+                loss = seg_loss(pred_mask, gt_mask)+ ce_loss(pred_mask.float(), gt_mask.float()) # MODO IN CUI CALCOLA LA LOSS MedSam
 
             focal_alpha = 20.
-            loss_total = loss #focal_alpha * loss_focal + loss_dice + loss_iou
+            loss_total = focal_alpha * loss_focal + loss_dice + loss_iou
+
+            loss_total = loss
             
             optimizer.zero_grad()
             fabric.backward(loss_total)
