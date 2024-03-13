@@ -145,14 +145,14 @@ def train_sam(
             batch_time.update(time.time() - end)
             end = time.time()
 
-            # focal_losses.update(loss_focal.item(), batch_size)
-            # dice_losses.update(loss_dice.item(), batch_size)
-            # iou_losses.update(loss_iou.item(), batch_size)
-            # total_losses.update(loss_total.item(), batch_size)
-            focal_losses.update(loss_focal.item())
-            dice_losses.update(loss_dice.item())
-            iou_losses.update(loss_iou.item())
-            total_losses.update(loss_total.item())
+            focal_losses.update(loss_focal.item(), cfg.batch_size)
+            dice_losses.update(loss_dice.item(), cfg.batch_size)
+            iou_losses.update(loss_iou.item(), cfg.batch_size)
+            total_losses.update(loss_total.item(), cfg.batch_size)
+            #focal_losses.update(loss_focal.item())
+            #dice_losses.update(loss_dice.item())
+            #iou_losses.update(loss_iou.item())
+            #total_losses.update(loss_total.item())
 
             fabric.print(f'Epoch: [{epoch}][{iter+1}/{len(train_dataloader)}]'
                          f' | Time [{batch_time.val:.3f}s ({batch_time.avg:.3f}s)]'
