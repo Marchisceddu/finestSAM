@@ -19,6 +19,7 @@ from utils import calc_iou
 import matplotlib.pyplot as plt
 import cv2
 import numpy as np
+import monai
 
 torch.set_float32_matmul_precision('high')
 
@@ -85,6 +86,9 @@ def train_sam(
     focal_loss = FocalLoss()
     dice_loss = DiceLoss()
 
+    seg_loss = monai.losses.DiceLoss(sigmoid=True, squared_pred=True, reduction="mean")
+    ce_loss = torch.nn.BCEWithLogitsLoss(reduction="mean")
+
     for epoch in range(1, cfg.num_epochs):
         batch_time = AverageMeter()
         data_time = AverageMeter()
@@ -135,9 +139,10 @@ def train_sam(
                 loss_focal += focal_loss(pred_mask, gt_mask)
                 loss_dice += dice_loss(pred_mask, gt_mask)
                 loss_iou += F.mse_loss(iou_prediction, batch_iou, reduction='sum') / num_masks
+                loss = seg_loss(pred_mask, gt_mask) + ce_loss(pred_mask, gt_mask)
 
             focal_alpha = 20.
-            loss_total = focal_alpha * loss_focal + loss_dice + loss_iou
+            loss_total = loss #focal_alpha * loss_focal + loss_dice + loss_iou
             
             optimizer.zero_grad()
             fabric.backward(loss_total)
@@ -150,10 +155,6 @@ def train_sam(
             dice_losses.update(loss_dice.item(), cfg.batch_size)
             iou_losses.update(loss_iou.item(), cfg.batch_size)
             total_losses.update(loss_total.item(), cfg.batch_size)
-            #focal_losses.update(loss_focal.item())
-            #dice_losses.update(loss_dice.item())
-            #iou_losses.update(loss_iou.item())
-            #total_losses.update(loss_total.item())
 
             fabric.print(f'Epoch: [{epoch}][{iter+1}/{len(train_dataloader)}]'
                          f' | Time [{batch_time.val:.3f}s ({batch_time.avg:.3f}s)]'
@@ -185,7 +186,8 @@ def configure_opt(cfg: Box, model: Model):
         else:
             return 1 / (cfg.opt.decay_factor**2)
 
-    optimizer = torch.optim.Adam(model.model.parameters(), lr=cfg.opt.learning_rate, weight_decay=cfg.opt.weight_decay)
+    # provare a passare solo i parametri di mask decoder al posto di tutti
+    optimizer = torch.optim.Adam(model.model.parameters(), lr=cfg.opt.learning_rate, weight_decay=cfg.opt.weight_decay) # si potrebbe provare AdamW
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
 
     return optimizer, scheduler
