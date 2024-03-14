@@ -124,18 +124,18 @@ def train_sam(
                 gt_mask = F.interpolate(single_data["mask_inputs"], single_data["original_size"], mode="bilinear", align_corners=False)
                 gt_mask = (gt_mask >= 0.5).float()
 
-                # stamp = pred_mask[2] > 0.0 # elimina il gradiente dalla maschera predetta e trasforma in bool per essere stampata
-                # single_frame = single_data["imo"]
-                # annotation_rgb = np.zeros_like(single_frame)
-                # annotation_rgb[stamp.squeeze().cpu().numpy()] = [1, 255, 255] 
+                stamp = pred_mask[2] > 0.0 # elimina il gradiente dalla maschera predetta e trasforma in bool per essere stampata
+                single_frame = single_data["imo"]
+                annotation_rgb = np.zeros_like(single_frame)
+                annotation_rgb[stamp.squeeze().cpu().numpy()] = [1, 255, 255] 
 
                 # annotation = gt_mask[2].squeeze().cpu().numpy() * 255
                 # annotation_rgb = np.repeat(annotation[..., np.newaxis], 3, axis=2).astype(np.uint8)
 
-                # image_with_annotation = cv2.addWeighted(single_data["imo"], 1, annotation_rgb, 0.5, 0)
-                # plt.imshow(image_with_annotation)
-                # plt.axis('off')
-                # plt.show()
+                image_with_annotation = cv2.addWeighted(single_data["imo"], 1, annotation_rgb, 0.5, 0)
+                plt.imshow(image_with_annotation)
+                plt.axis('off')
+                plt.show()
                 batch_iou = calc_iou(pred_mask, gt_mask)
                 loss_focal += focal_loss(pred_mask, gt_mask)
                 loss_dice += dice_loss(pred_mask, gt_mask)
@@ -147,7 +147,7 @@ def train_sam(
             focal_alpha = 20.
             loss_total = focal_alpha * loss_focal + loss_dice + loss_iou
 
-            loss_total = loss
+            #loss_total = loss
             
             optimizer.zero_grad()
             fabric.backward(loss_total)
