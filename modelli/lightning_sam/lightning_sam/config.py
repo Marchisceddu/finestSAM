@@ -4,9 +4,9 @@ config = {
     "num_devices": "auto",
     "batch_size": 1,
     "num_workers": 2,
-    "num_epochs": 100,
+    "num_epochs": 200,
     "k_fold": 5,
-    "eval_interval": 10,
+    "eval_interval": 99,
     "out_dir": "out/training",
     "opt": {
         "learning_rate": 8e-4,
@@ -20,7 +20,7 @@ config = {
         "checkpoint": "../sav/sam_vit_h_4b8939.pth",
         "freeze": {
             "image_encoder": True,
-            "prompt_encoder": True,
+            "prompt_encoder": False,
             "mask_decoder": False,
         },
     },

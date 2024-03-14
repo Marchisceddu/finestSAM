@@ -50,7 +50,7 @@ class Sam(nn.Module):
     def device(self) -> Any:
         return self.pixel_mean.device
 
-    #@torch.no_grad()
+    @torch.no_grad()
     def forward(
         self,
         batched_input: List[Dict[str, Any]],
@@ -98,18 +98,16 @@ class Sam(nn.Module):
         input_images = torch.stack([self.preprocess(x["image"]) for x in batched_input], dim=0)
         image_embeddings = self.image_encoder(input_images)
 
-        input_masks = torch.stack([self.preprocess_masks(x["mask_inputs"]) for x in batched_input], dim=0)
-
         outputs = []
-        for image_record, curr_embedding, mask in zip(batched_input, image_embeddings, input_masks):
+        for image_record, curr_embedding in zip(batched_input, image_embeddings):
             if "point_coords" in image_record:
                 points = (image_record["point_coords"], image_record["point_labels"])
             else:
                 points = None
             sparse_embeddings, dense_embeddings = self.prompt_encoder(
-                points=None, # CAMBIARE QUANDDO SI AGGIUNGONO I PUNTI
+                points=points,
                 boxes=image_record.get("boxes", None),
-                masks=mask,
+                masks=image_record.get("mask_inputs", None),
             )
             low_res_masks, iou_predictions = self.mask_decoder(
                 image_embeddings=curr_embedding.unsqueeze(0),
@@ -123,7 +121,7 @@ class Sam(nn.Module):
                 input_size=image_record["image"].shape[-2:],
                 original_size=image_record["original_size"],
             )
-            #masks = masks > self.mask_threshold # QUESTA MERDA E' L'ERRORE TI ELIMINA I GREDIENTI 
+            masks = masks > self.mask_threshold
             outputs.append(
                 {
                     "masks": masks,
@@ -173,14 +171,5 @@ class Sam(nn.Module):
         h, w = x.shape[-2:]
         padh = self.image_encoder.img_size - h
         padw = self.image_encoder.img_size - w
-        x = F.pad(x, (0, padw, 0, padh))
-        return x
-    
-    def preprocess_masks(self, x: torch.Tensor) -> torch.Tensor:
-        """Normalize pixel values and pad to a square input."""
-        # Pad
-        h, w = x.shape[-2:]
-        padh = self.image_encoder.img_size//4 - h
-        padw = self.image_encoder.img_size//4 - w
         x = F.pad(x, (0, padw, 0, padh))
         return x
