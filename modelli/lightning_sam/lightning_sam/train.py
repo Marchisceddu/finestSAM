@@ -203,7 +203,7 @@ def main(cfg: Box) -> None:
     current_directory = os.path.dirname(current_file_path)
     cfg.out_dir = os.path.join(current_directory, cfg.out_dir)
 
-    fabric = L.Fabric(accelerator="cpu",
+    fabric = L.Fabric(accelerator="auto",
                       devices=cfg.num_devices,
                       strategy="auto",
                       loggers=[TensorBoardLogger(cfg.out_dir, name="lightning-sam")])
@@ -225,10 +225,7 @@ def main(cfg: Box) -> None:
     optimizer, scheduler = configure_opt(cfg, model)
     model, optimizer = fabric.setup(model, optimizer)
 
-    for iter, data in enumerate(train_data): # DA TOGLIERE
-        continue
-
-    #train_sam(cfg, fabric, model, optimizer, scheduler, train_data, val_data)
+    train_sam(cfg, fabric, model, optimizer, scheduler, train_data, val_data)
     #validate(fabric, model, train_data, epoch=0)
 
 
