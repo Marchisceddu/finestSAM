@@ -114,8 +114,8 @@ class Model(nn.Module):
         """Normalize pixel values and pad to a square input."""
         # Pad
         h, w = x.shape[-2:]
-        padh = self.image_encoder.img_size//4 - h
-        padw = self.image_encoder.img_size//4 - w
+        padh = self.model.image_encoder.img_size//4 - h
+        padw = self.model.image_encoder.img_size//4 - w
         x = F.pad(x, (0, padw, 0, padh))
         return x
 

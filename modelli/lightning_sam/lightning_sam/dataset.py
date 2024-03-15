@@ -49,37 +49,36 @@ class COCODataset(Dataset):
         # Get box, point and mask for any annotations
         for ann in anns:
             x, y, w, h = ann['bbox']
+
             boxes.append([x, y, x + w, y + h])
 
             mask = self.coco.annToMask(ann)
             masks.append(mask)
+
+            point_coords.append([[x + w // 2, y + h // 2]])
             
-            list_point = []
-            for point in ann['segmentation']:
-                x, y = point[0], point[1]
-                list_point.append([x, y])
+            # list_point_1 = []
+            # list_point_0 = []
+            # for j in range(y, y + h):
+            #     for i in range(x, x + w):
+            #         if i >= 0 and i < len(mask[0]) and j >= 0 and j < len(mask):
+            #             if mask[j][i]:
+            #                 list_point_1.append([i, j])
+            #             else:
+            #                 list_point_0.append([i, j])
 
-            bbox_internal_points = []
-            for j in range(y, y + h):
-                for i in range(x, x + w):
-                    if i >= 0 and i < len(mask[0]) and j >= 0 and j < len(mask):
-                        if not mask[j][i]:
-                            bbox_internal_points.append([i, j])
+            # color = (255, 0, 0)
+            # x, y, x2, y2 = [x, y, x + w, y + h]
+            # cv2.rectangle(image, (x, y), (x2, y2), color, 2)
+            # for p in list_point_1:
+            #     x, y = p
+            #     cv2.circle(image, (x, y), 2, (0, 255, 0), -1)
+            # cv2.imshow('Bounding Boxes', image)
+            # cv2.waitKey(0)
+            # cv2.destroyAllWindows()
 
-            for point in list_point:
-                plt.scatter(point[0], point[1], color='blue', label='Segmentation Points')
-
-            # Disegna i punti interni alla bbox ma esterni alla maschera
-            for point in bbox_internal_points:
-                plt.scatter(point[0], point[1], color='red', label='Internal Points')
-
-            plt.xlabel('X')
-            plt.ylabel('Y')
-            plt.title('Segmentation Points and Internal Points')
-            plt.show()
-
-            point_coords.append(list_point)
-
+            #point_coords.append()
+    
         if self.transform:
             image, masks, boxes, point_coords = self.transform(image, masks, np.array(boxes), np.array(point_coords))
 
@@ -91,9 +90,6 @@ class COCODataset(Dataset):
         masks = torch.tensor(np.stack(masks, axis=0)).float()
         point_coords = torch.tensor(np.stack(point_coords, axis=0))
         point_labels = torch.as_tensor(point_labels, dtype=torch.int)
-
-        print(point_coords)
-        print(point_coords.shape)
 
         masks = masks.unsqueeze(1)
         
@@ -134,7 +130,7 @@ class ResizeAndPad:
         # SAM RICHIEDE DELLE MASCHERE 4X RISOLUZIONE INFERIORE DELLE IMMAGINI, PERO LE NOSTRE LOSS FUNCTION SONO FATTE PER DELLE MASCHERE DI RISOLUZIONE UGUALE, CAPIRE SE SONO DA CAMBIARE E SE SI COME CAMBIARLE
         resized_masks = []
         for mask in masks:
-            #mask = F.max_pool2d(mask.unsqueeze(0).unsqueeze(0), kernel_size=4, stride=4).squeeze()
+            mask = F.max_pool2d(mask.unsqueeze(0).unsqueeze(0), kernel_size=4, stride=4).squeeze()
             resized_masks.append(mask)
 
         # Pad image to form a square

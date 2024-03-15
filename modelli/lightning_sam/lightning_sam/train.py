@@ -107,7 +107,7 @@ def train_sam(
 
             data_time.update(time.time() - end)
             #batch_size = data["image"].size(0)
-            outputs = model(batched_input=data, multimasks_output=False)
+            outputs = model(batched_input=data, multimask_output=False)
 
             pred_masks = []
             iou_predictions = []
