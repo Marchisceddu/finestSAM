@@ -21,6 +21,7 @@
 * Eseguire il file [create_dataset/__init__.py](https://github.com/Marchisceddu/Progetto_Urbismap/blob/main/create_dataset/__init__.py):
 
     Args (opzionali):
+    
         --scegli_input (bool) default:False : Se True, permette di scegliere la cartella di input 
                              (deve essere formattata come la cartella shp)
         --mostra_output (bool) default:False : Se True, mostra l'output del dataset
