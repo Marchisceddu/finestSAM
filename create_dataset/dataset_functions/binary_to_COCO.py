@@ -49,8 +49,6 @@ This includes sections for "info," "licenses," "images," "categories," and "anno
 
 Finally, the assembled COCO JSON data is saved to a file, 
 making it ready to be used with tools and frameworks that support the COCO data format.
-
-
 """
 
 import glob
@@ -59,6 +57,7 @@ import os
 import cv2
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+
 
 # Label IDs of the dataset representing different categories
 category_ids = {
@@ -70,9 +69,10 @@ ORIGINAL_EXT = 'png'
 image_id = 0
 annotation_id = 0
 
-ROOT_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
 MASKS_PATH = os.path.join(ROOT_PATH, "../../dataset/masks/")
 JSON_PATH =  os.path.join(ROOT_PATH, "../../dataset/annotations.json")
+
 
 def images_annotations_info(maskpath):
     """
@@ -183,10 +183,11 @@ def create_annotation_COCO(mask_path = MASKS_PATH, dest_json = JSON_PATH):
     with open(dest_json, "w") as outfile:
         json.dump(coco_format, outfile, sort_keys=True, indent=4)
 
-    print("Created %d annotations for images in folder: %s" % (annotation_cnt, mask_path))
+    print(f"Created {annotation_cnt} annotations for images in folder: {mask_path}")
 
 if __name__ == "__main__":
     # esempio di utilizzo
-    train_mask_path = os.path.join(ROOT_PATH, "../../dataset/coco/masks/")
-    train_json_path = os.path.join(ROOT_PATH, "../../dataset/coco/annotations.json")
+    # il percorso deve partire dalla cartella dove si trova il file .py
+    train_mask_path = os.path.join(ROOT_PATH, "../../dataset/masks/")
+    train_json_path = os.path.join(ROOT_PATH, "../../dataset/annotations.json")
     create_annotation_COCO(train_mask_path, train_json_path)

@@ -1,8 +1,5 @@
 **/.DS_Store
-datasetV/
+*.py[co]
+
 create_dataset/shp/*
-create_dataset/binary_mask/masks_tif/*
-dataset/coco/masks/shape/*
-modelli/lightning_sam/sav/*.pth
-modelli/Yolov8/pre_train/*.pt
-modelli/Yolov8/runs/*
+shape_SAM/sav/*.pth

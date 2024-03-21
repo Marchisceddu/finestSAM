@@ -18,3 +18,9 @@ def get_png_file_path():
   root = tk.Tk()
   root.withdraw()
   return filedialog.askopenfilename(title="Seleziona un file PNG", filetypes=[("Portable Network Graphics", "*.png")])
+
+def get_folder_path():
+  """Apre una finestra di dialogo per la selezione di una cartella e restituisce il percorso."""
+  root = tk.Tk()
+  root.withdraw()
+  return filedialog.askdirectory(title="Seleziona una cartella")

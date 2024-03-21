@@ -1,10 +1,11 @@
+import os
+import matplotlib.pyplot as plt
 from torchvision.datasets import CocoDetection
 from torchvision import transforms
-from PIL import Image, ImageDraw
-import matplotlib.pyplot as plt
-import os
+from PIL import ImageDraw
 
-def display_image_with_annotations_COCO(images_path, annotation_path):
+
+def display_COCO(images_path, annotation_path):
     # Definisci la trasformazione per le immagini
     transform = transforms.ToTensor()
 
@@ -36,9 +37,8 @@ def display_image_with_annotations_COCO(images_path, annotation_path):
         plt.figure()
         plt.imshow(image_pil)
         plt.axis('off')
-
         plt.show()
 
 if __name__ == "__main__":
     # esempio di utilizzo
-    display_image_with_annotations_COCO("./dataset/images", "./dataset/annotations.json") # AGGIUSTARE I PERCORSI
+    display_COCO("../../dataset/images/", "../../dataset/annotations.json") # il percorso deve partire dalla cartella dove si trova il file .py

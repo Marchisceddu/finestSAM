@@ -1,19 +1,20 @@
+import os
+import rasterio
+import numpy as np
 import geopandas as gpd
 import matplotlib.pyplot as plt
-import rasterio
 from rasterio import features
-import numpy as np
-import os
+from shapely.geometry import box
 from PIL import Image
 from tqdm import tqdm
-from PIL import Image
-from shapely.geometry import box
+
 
 # Definizione dei percorsi
-ROOT_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-ORIGIN_IMG_PATH = os.path.join(ROOT_PATH, "../../dataset/images")
-OUT_TIF_PATH = os.path.join(ROOT_PATH, "../create_dataset/binary_mask/masks_tif")
-OUT_PNG_PATH = os.path.join(ROOT_PATH, "../../dataset/masks/shape")
+ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
+ORIGIN_IMG_PATH = os.path.join(ROOT_PATH, "../../dataset/images/")
+OUT_TIF_PATH = os.path.join(ROOT_PATH, "../binary_mask/")
+OUT_PNG_PATH = os.path.join(ROOT_PATH, "../../dataset/masks/shape/")
+
 
 def shp_plot(shapefile_path):
     """
@@ -46,6 +47,7 @@ def shp_plot(shapefile_path):
     # Mostra il plot
     plt.show()
 
+
 def convert_tif_to_png(file_path, output_path, file_name = -1):
     """
     Converte un file TIF in PNG.
@@ -58,27 +60,27 @@ def convert_tif_to_png(file_path, output_path, file_name = -1):
 
     with rasterio.open(file_path) as src:
         # Leggi il raster
-        data = src.read(1)
+        data = src.read()
 
-        # Controlla se il raster contiene valori nulli
-        max_value = 1 if (np.max(data) or np.any(np.isnan(data)) == 0) else np.max(data)
-        # if np.any(np.isnan(data)):
-        #     # Se sono presenti valori nulli, imposta il valore massimo a 1
-        #     max_value = 1
-        # else:
-        #     # Se non ci sono valori nulli, usa il valore massimo originale
-        #     max_value = 1 if np.max(data) == 0 else np.max(data)
+        # Verifica se l'immagine TIF è a colori RGB
+        is_rgb = data.shape[0] == 3  # Se il primo asse ha dimensione 3, è un'immagine RGB
 
         # Normalizza i valori del raster
+        max_value = np.max(data)
         normalized_data = (data / max_value * 255).astype(np.uint8)
 
         # Crea l'immagine PIL
-        tif_image = Image.fromarray(normalized_data)
+        if is_rgb:
+            # Se è un'immagine RGB, trasponi gli assi per ottenere l'ordine corretto
+            tif_image = Image.fromarray(normalized_data.transpose(1, 2, 0), 'RGB')
+        else:
+            # Altrimenti, crea un'immagine in scala di grigi
+            tif_image = Image.fromarray(normalized_data[0])
 
         # Conta solo i file nella directory
         if file_name == -1:
             file_name = len(os.listdir(output_path))
-        
+
         # Crea il percorso per il file PNG di output
         output_file_path = os.path.join(output_path, f"{file_name}.png")
 
@@ -100,7 +102,7 @@ def tif_to_png(input_path, output_path):
     if os.path.isfile(input_path): # Se è un file, lo converte
         convert_tif_to_png(input_path, output_path)
     elif os.path.isdir(input_path): # Se è una cartella, converte tutti i file TIF al suo interno
-        bar = tqdm(total = len(os.listdir(input_path)), desc = "Conversione da .tif a .png", position = 2, leave = False)
+        bar = tqdm(total = len(os.listdir(input_path)), desc = "Conversione da .tif a .png", position = 1, leave = False)
         idx = 0
         for filename in os.listdir(input_path):
             bar.update(1)
@@ -109,6 +111,7 @@ def tif_to_png(input_path, output_path):
                 idx += 1
     else:
         raise ValueError(f"Percorso non valido: {input_path}")
+
 
 def shp_to_bm(tif_file_path, shp_file_path, output_folder):
     """
@@ -130,7 +133,7 @@ def shp_to_bm(tif_file_path, shp_file_path, output_folder):
         crs = src.crs
         data = src.read(1)  # Leggi il raster
 
-    bar = tqdm(total = len(gdf), desc = "Creazione maschere binarie tif", position = 2, leave = False)
+    bar = tqdm(total = len(gdf), desc = "Creazione maschere binarie tif", position = 1, leave = False)
     minx, miny, maxx, maxy = src.bounds
     tif_bounds = box(minx, miny, maxx, maxy)
 
@@ -169,19 +172,18 @@ def shp_to_bm(tif_file_path, shp_file_path, output_folder):
         except AttributeError:
             continue
 
+
 def crete_binary_mask(tif_file_path, shp_file_path):
     # Trova il nome dell'immagine a cui si riferisce
     image_name = len(os.listdir(ORIGIN_IMG_PATH))
     out_tif = f"{OUT_TIF_PATH}/{image_name}"
     out_png = f"{OUT_PNG_PATH}/{image_name}"
 
-    # Converte tutti il file tif selezionato in file png
+    # Converte il file tif (immagine originale) selezionato in file png
     tif_to_png(tif_file_path, ORIGIN_IMG_PATH)
 
     # Crea una maschera binaria per ogni forma georeferenziata
     shp_to_bm(tif_file_path, shp_file_path, out_tif)
 
-    # Converte tutti i file tif in file png
+    # Converte tutti i file tif (maschere binarie) in file png
     tif_to_png(out_tif, out_png)
-
-    print("Maschera binaria completata")
