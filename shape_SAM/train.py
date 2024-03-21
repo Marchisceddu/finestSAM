@@ -1,32 +1,31 @@
 import os
+import cv2
 import time
-
+import numpy as np
 import lightning as L
 import segmentation_models_pytorch as smp
 import torch
 import torch.nn.functional as F
+import matplotlib.pyplot as plt
 from box import Box
-from config import cfg
+from model.config import cfg
 from dataset import load_datasets
 from lightning.fabric.fabric import _FabricOptimizer
 from lightning.fabric.loggers import TensorBoardLogger
-from losses import DiceLoss
-from losses import FocalLoss
-from model import Model
+from model.losses import DiceLoss
+from model.losses import FocalLoss
+from model.model import shape_SAM
 from torch.utils.data import DataLoader
-from utils import AverageMeter
-from utils import calc_iou
-import matplotlib.pyplot as plt
-import cv2
-import numpy as np
-import monai
+from model.utils import AverageMeter
+from model.utils import calc_iou
+
 
 torch.set_float32_matmul_precision('high')
 
 
 def save(
     fabric: L.Fabric, 
-    model: Model, 
+    model: shape_SAM, 
     cfg: Box,
     epoch: int = 0,
     f1_scores: AverageMeter = AverageMeter(),
@@ -38,7 +37,7 @@ def save(
     model.train()
 
 
-def validate(fabric: L.Fabric, model: Model, val_dataloader: DataLoader, epoch: int = 0):
+def validate(fabric: L.Fabric, model: shape_SAM, val_dataloader: DataLoader, epoch: int = 0): # CAMBIARE PER FUNZIONARE CON MULTIMASK TRUE E CON TUTTI I CAMBIAMENTI CHE SONO STATI FATTI
     model.eval()
     ious = AverageMeter()
     f1_scores = AverageMeter()
@@ -75,7 +74,7 @@ def validate(fabric: L.Fabric, model: Model, val_dataloader: DataLoader, epoch: 
 def train_sam(
     cfg: Box,
     fabric: L.Fabric,
-    model: Model,
+    model: shape_SAM,
     optimizer: _FabricOptimizer,
     scheduler: _FabricOptimizer,
     train_dataloader: DataLoader,
@@ -85,9 +84,6 @@ def train_sam(
 
     focal_loss = FocalLoss()
     dice_loss = DiceLoss()
-
-    seg_loss = monai.losses.DiceLoss(sigmoid=True, squared_pred=True, reduction="mean")
-    ce_loss = torch.nn.BCEWithLogitsLoss(reduction="mean")
 
     for epoch in range(1, cfg.num_epochs):
         batch_time = AverageMeter()
@@ -99,75 +95,81 @@ def train_sam(
         end = time.time()
         validated = False
 
-        for iter, data in enumerate(train_dataloader):
+        for iter, batched_data in enumerate(train_dataloader):
             if epoch > 1 and epoch % cfg.eval_interval == 0 and not validated:
                 #validate(fabric, model, val_dataloader, epoch)
                 save(fabric, model, cfg, epoch)
                 validated = True
 
             data_time.update(time.time() - end)
-            #batch_size = data["image"].size(0)
-            outputs = model(batched_input=data, multimask_output=True)
 
-            pred_masks = []
+            outputs = model(batched_input=batched_data, multimask_output=True)
+
+            batched_pred_masks = []
             iou_predictions = []
             for item in outputs:
-                pred_masks.append(item["masks"])
+                batched_pred_masks.append(item["masks"])
                 iou_predictions.append(item["iou_predictions"])
 
-            num_masks = sum(len(pred_mask) for pred_mask in pred_masks)
+            num_masks = sum(len(pred_masks) for pred_masks in batched_pred_masks)
 
             loss_focal = torch.tensor(0., device=fabric.device)
             loss_dice = torch.tensor(0., device=fabric.device)
             loss_iou = torch.tensor(0., device=fabric.device)
-            for pred_mask, single_data, iou_prediction in zip(pred_masks, data, iou_predictions):
-                gt_mask = F.interpolate(single_data["mask_inputs"], single_data["original_size"], mode="bilinear", align_corners=False)
-                gt_mask = (gt_mask >= 0.5).float()
 
-                separated_masks = [] # 3 maschere di output
-                separated_scores = [] # sono le IoU predictions
+            for pred_masks, data, iou_prediction in zip(batched_pred_masks, batched_data, iou_predictions):
+                # Resize the ground truth mask to the original size
+                gt_mask = F.interpolate(data["mask_inputs"], data["original_size"], mode="bilinear", align_corners=False)
+                gt_mask = (gt_mask >= 0.5).float() # binarize the mask
 
-                for i in range(pred_mask.shape[1]):
-                  separated_masks.append(pred_mask[:, i, :, :])
-                  separated_masks[i] = separated_masks[i].unsqueeze(1)
-                  separated_scores.append(iou_prediction[:,i])
+                # Separate the masks and scores for each class
+                separated_masks = [] # List to store the separated masks
+                separated_scores = [] # List to store the IoU predictions
+                for i in range(pred_masks.shape[1]):
+                    separated_masks.append(pred_masks[:, i, :, :].unsqueeze(1))
+                    separated_scores.append(iou_prediction[:, i])
 
+                # Find the class with the highest average score
                 best_score = 0
+                best_index = 0
                 for i in range(len(separated_scores)):
-                  if(best_score < torch.mean(separated_scores[i])):
-                    best_score = torch.mean(separated_scores[i]).item()
-                    iou_prediction = separated_scores[i]
-                    pred_mask = separated_masks[i]
+                    score = torch.mean(separated_scores[i]).item()
+                    if score > best_score:
+                        best_score = score
+                        best_index = i
 
-                stamp = pred_mask[2] > 0.0 # elimina il gradiente dalla maschera predetta e trasforma in bool per essere stampata
-                single_frame = single_data["imo"]
+                # Update the predictions and masks with the best class
+                iou_prediction = separated_scores[best_index]
+                pred_masks = separated_masks[best_index]
+
+                ### STAMPA (ELIMINARE)
+                stamp = pred_masks[2] > 0.0 # elimina il gradiente dalla maschera predetta e trasforma in bool per essere stampata
+                single_frame = data["imo"]
                 annotation_rgb = np.zeros_like(single_frame)
                 annotation_rgb[stamp.squeeze().cpu().numpy()] = [1, 255, 255] 
 
                 # annotation = gt_mask[2].squeeze().cpu().numpy() * 255
                 # annotation_rgb = np.repeat(annotation[..., np.newaxis], 3, axis=2).astype(np.uint8)
 
-                image_with_annotation = cv2.addWeighted(single_data["imo"], 1, annotation_rgb, 0.5, 0)
+                image_with_annotation = cv2.addWeighted(data["imo"], 1, annotation_rgb, 0.5, 0)
                 plt.imshow(image_with_annotation)
                 plt.axis('off')
                 plt.show()
-                batch_iou = calc_iou(pred_mask, gt_mask)
-                loss_focal += focal_loss(pred_mask, gt_mask)
-                loss_dice += dice_loss(pred_mask, gt_mask)
-                loss_iou += F.mse_loss(iou_prediction, batch_iou, reduction='sum') / num_masks
-                # sicuro con il gradiente delle maschere adesso funzionano anche queste, in caso ora si possono cambiare e il train non si bassa più su iou_prediction
+                ### FINE STAMPA
 
-                loss = seg_loss(pred_mask, gt_mask)+ ce_loss(pred_mask.float(), gt_mask.float()) # MODO IN CUI CALCOLA LA LOSS MedSam
+                batch_iou = calc_iou(pred_masks, gt_mask)
+                loss_focal += focal_loss(pred_masks, gt_mask)
+                loss_dice += dice_loss(pred_masks, gt_mask)
+                loss_iou += F.mse_loss(iou_prediction, batch_iou, reduction='sum') / num_masks
 
             focal_alpha = 20.
             loss_total = focal_alpha * loss_focal + loss_dice + loss_iou
-
-            #loss_total = loss
             
             optimizer.zero_grad()
             fabric.backward(loss_total)
             optimizer.step()
             scheduler.step()
+
             batch_time.update(time.time() - end)
             end = time.time()
 
@@ -191,11 +193,9 @@ def train_sam(
                 'dice loss': dice_losses.val,
             }
             fabric.log_dict(log_info, step=steps)
-            
-            
 
 
-def configure_opt(cfg: Box, model: Model):
+def configure_opt(cfg: Box, model: shape_SAM):
 
     def lr_lambda(step):
         if step < cfg.opt.warmup_steps:
@@ -206,35 +206,29 @@ def configure_opt(cfg: Box, model: Model):
             return 1 / cfg.opt.decay_factor
         else:
             return 1 / (cfg.opt.decay_factor**2)
-        
-    # https://github.com/computational-cell-analytics/micro-sam/blob/master/examples/finetuning/finetune_hela.py
-    # provare a leggere la linea 101, fa una cosa per l'optimizer apposta per la istance segmentation
 
-    # provare a passare solo i parametri di mask decoder al posto di tutti
-    optimizer = torch.optim.Adam(model.model.parameters(), lr=cfg.opt.learning_rate, weight_decay=cfg.opt.weight_decay) # si potrebbe provare AdamW
+    optimizer = torch.optim.Adam(model.model.parameters(), lr=cfg.opt.learning_rate, weight_decay=cfg.opt.weight_decay)
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
-    # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.9, patience=10, verbose=True) # si potrebbe provare
 
     return optimizer, scheduler
 
 
 def main(cfg: Box) -> None:
-    current_file_path = os.path.abspath(__file__)
-    current_directory = os.path.dirname(current_file_path)
+    current_directory = os.path.dirname(os.path.abspath(__file__))
     cfg.out_dir = os.path.join(current_directory, cfg.out_dir)
 
     fabric = L.Fabric(accelerator="auto",
                       devices=cfg.num_devices,
                       strategy="auto",
-                      loggers=[TensorBoardLogger(cfg.out_dir, name="lightning-sam")])
+                      loggers=[TensorBoardLogger(cfg.out_dir, name="loggers_shape_SAM")])
     fabric.launch()
-    fabric.seed_everything(1337 + fabric.global_rank)
+    fabric.seed_everything(cfg.seed + fabric.global_rank)
 
     if fabric.global_rank == 0:
         os.makedirs(cfg.out_dir, exist_ok=True)
 
     with fabric.device:
-        model = Model(cfg)
+        model = shape_SAM(cfg)
         model.setup()
         model.to(fabric.device)
 
@@ -246,7 +240,7 @@ def main(cfg: Box) -> None:
     model, optimizer = fabric.setup(model, optimizer)
 
     train_sam(cfg, fabric, model, optimizer, scheduler, train_data, val_data)
-    #validate(fabric, model, train_data, epoch=0)
+    validate(fabric, model, train_data, epoch=0)
 
 
 if __name__ == "__main__":

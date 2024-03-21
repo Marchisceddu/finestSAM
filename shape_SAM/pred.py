@@ -1,19 +1,14 @@
-from model import Model
-from config import cfg
-import lightning as L
-from lightning.fabric.loggers import TensorBoardLogger
-import cv2
-import matplotlib.pyplot as plt
-import numpy as np
 import os
+import cv2
+import numpy as np
+import lightning as L
+import matplotlib.pyplot as plt
+from lightning.fabric.loggers import TensorBoardLogger
+from model.model import Model
+from model.config import cfg
 
-'''
-    esempio di come potrebbe essere, documentazione utile 
-    tutte le maschere -> https://colab.research.google.com/github/facebookresearch/segment-anything/blob/main/notebooks/automatic_mask_generator_example.ipynb#scrollTo=68364513
-    singola maschera per punto -> https://colab.research.google.com/github/facebookresearch/segment-anything/blob/main/notebooks/predictor_example.ipynb#scrollTo=b4a4b25c
-'''
 
-def show_anns(anns):
+def show_anns(anns, opacity=0.35):
     if len(anns) == 0:
         return
     sorted_anns = sorted(anns, key=(lambda x: x['area']), reverse=True)
@@ -24,14 +19,14 @@ def show_anns(anns):
     img[:,:,3] = 0
     for ann in sorted_anns:
         m = ann['segmentation']
-        color_mask = np.concatenate([np.random.random(3), [1]])
+        color_mask = np.concatenate([np.random.random(3), [opacity]])
         img[m] = color_mask
     ax.imshow(img)
 
+
 def pred(path):
     # Ottiene il percorso dell'immagine
-    current_file_path = os.path.abspath(__file__)
-    current_directory = os.path.dirname(current_file_path)
+    current_directory = os.path.dirname(os.path.abspath(__file__))
     image_path = os.path.join(current_directory, path)
 
     image = cv2.imread(image_path)
@@ -39,10 +34,9 @@ def pred(path):
     # Carica il modello con il salvataggio presente in cfg
     fabric = L.Fabric(accelerator="auto",
                     devices=cfg.num_devices,
-                    strategy="auto",
-                    loggers=[TensorBoardLogger(cfg.out_dir, name="lightning-sam")])
+                    strategy="auto")
     fabric.launch()
-    fabric.seed_everything(1337 + fabric.global_rank)
+    fabric.seed_everything(cfg.seed + fabric.global_rank)
 
     with fabric.device:
         model = Model(cfg)
@@ -50,15 +44,17 @@ def pred(path):
         model.to(fabric.device)
 
     # Esegue la predizione di tutte le maschere
-    predictor = model.get_predictor()
+    predictor = model.get_automatic_predictor(min_mask_region_area = 300)
     masks = predictor.generate(image)
 
     # Visualizza l'immagine con le maschere
     plt.figure(figsize=(8,8))
     plt.imshow(image)
-    show_anns(masks)
+    show_anns(masks, opacity=1)
     plt.axis('off')
     plt.show()
 
+    # Trasforma le maschere in shape
+
 if __name__ == '__main__':
-    pred('../../../dataset/images/1.png')
+    pred('../dataset/images/0.png')

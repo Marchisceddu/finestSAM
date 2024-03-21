@@ -1,26 +1,28 @@
 import os
-import time
-from config import cfg
 import cv2
-import numpy as np
 import torch
+import random
+import numpy as np
 import torchvision.transforms as transforms
 import torch.nn.functional as F
 from pycocotools.coco import COCO
 from segment_anything.utils.transforms import ResizeLongestSide
 from torch.utils.data import DataLoader
 from torch.utils.data import Dataset
-import torch.nn as nn
-import matplotlib.pyplot as plt
+from config import cfg
 
 
 class COCODataset(Dataset):
 
-    def __init__(self, root_dir, annotation_file, transform=None):
+    def __init__(self, root_dir, annotation_file, transform=None, seed=42):
+        self.seed = seed
         self.root_dir = root_dir
         self.transform = transform
         self.coco = COCO(annotation_file)
         self.image_ids = list(self.coco.imgs.keys())
+
+        # Set seed for reproducibility
+        random.seed(self.seed) 
 
         # Filter out image_ids without any annotations
         self.image_ids = [image_id for image_id in self.image_ids if len(self.coco.getAnnIds(imgIds=image_id)) > 0]
@@ -29,8 +31,6 @@ class COCODataset(Dataset):
         return len(self.image_ids)
     
     def __getitem__(self, idx):
-        np.random.seed(42)
-
         # Restor the image from the folder
         image_id = self.image_ids[idx]
         image_info = self.coco.loadImgs(image_id)[0]
@@ -52,51 +52,38 @@ class COCODataset(Dataset):
 
         # Get box, point and mask for any annotations
         for ann in anns:
+            # Get the bounding box
             x, y, w, h = ann['bbox']
             boxes.append([x, y, x + w, y + h])
 
+            # Get the mask
             mask = self.coco.annToMask(ann)
             masks.append(mask)
             
-            list_point_0 = []
+            # Get the points
             list_point_1 = []
+            list_point_0 = []
             for j in range(y, y + h):
                 for i in range(x, x + w):
-                    if i >= 0 and i < len(mask[0]) and j >= 0 and j < len(mask):
+                    if 0 <= i < len(mask[0]) and 0 <= j < len(mask):
                         if mask[j][i]:
                             list_point_1.append([i, j])
                         else:
                             list_point_0.append([i, j])
 
-            temp_list_point = []
-            for i in range(0, cfg.dataset.positive_points):
-                idx = np.random.randint(0, len(list_point_1))
-                temp_list_point.append(list_point_1[idx])
-            list_point_1 = temp_list_point.copy()
+            while len(list_point_1) < cfg.dataset.positive_points:
+                list_point_1.append(random.choice(list_point_1))
+            while len(list_point_0) < cfg.dataset.negative_points:
+                list_point_0.append(random.choice(list_point_0))
 
-            temp_list_point.clear()
-            for i in range(0, cfg.dataset.negative_points):
-                idx = np.random.randint(0, len(list_point_0))
-                temp_list_point.append(list_point_0[idx])
-            list_point_0 = temp_list_point.copy()
+            list_point_1 = random.sample(list_point_1, cfg.dataset.positive_points)
+            list_point_0 = random.sample(list_point_0, cfg.dataset.negative_points)
 
-            list_label_0 = [0] * len(list_point_0)
             list_label_1 = [1] * len(list_point_1)
-
-            # color = (255, 0, 0)
-            # i = image.copy()
-            # x, y, x2, y2 = [x, y, x + w, y + h]
-            # cv2.rectangle(i, (x, y), (x2, y2), color, 2)
-            # for p in list_point_1:
-            #     x, y = p
-            #     cv2.circle(i, (x, y), 2, (0, 255, 0), -1)
-            # cv2.imshow('Bounding Boxes', i)
-            # cv2.waitKey(0)
-            # cv2.destroyAllWindows()
+            list_label_0 = [0] * len(list_point_0)
 
             point_coords.append(list_point_1 + list_point_0)
             point_labels.append(list_label_1 + list_label_0)
-
     
         if self.transform:
             image, masks, boxes, point_coords = self.transform(image, masks, np.array(boxes), np.array(point_coords))
@@ -143,35 +130,14 @@ class ResizeAndPad:
         image = self.to_tensor(image)
 
         # Resize masks to 1/4th resolution of the image 
-        # SAM RICHIEDE DELLE MASCHERE 4X RISOLUZIONE INFERIORE DELLE IMMAGINI, PERO LE NOSTRE LOSS FUNCTION SONO FATTE PER DELLE MASCHERE DI RISOLUZIONE UGUALE, CAPIRE SE SONO DA CAMBIARE E SE SI COME CAMBIARLE
         resized_masks = []
         for mask in masks:
             mask = F.max_pool2d(mask.unsqueeze(0).unsqueeze(0), kernel_size=4, stride=4).squeeze()
             resized_masks.append(mask)
 
-        # Pad image to form a square
-        # _, h, w = image.shape
-        # max_dim = max(w, h)
-        # pad_w = (max_dim - w) // 2
-        # pad_h = (max_dim - h) // 2
-        # padding = (pad_w, pad_h, max_dim - w - pad_w, max_dim - h - pad_h)
-        # image = transforms.Pad(padding)(image)
-
-        # Pad masks to form a square
-        # h, w = resized_masks[0].shape
-        # max_dim = max(w, h)
-        # pad_w = (max_dim - w) // 2
-        # pad_h = (max_dim - h) // 2
-        # padding = (pad_w, pad_h, max_dim - w - pad_w, max_dim - h - pad_h)
-        # resized_masks = [transforms.Pad(padding)(mask) for mask in resized_masks]
-
-        # Adjust bounding boxes
+        # Adjust bounding boxes and point coordinates
         boxes = self.transform.apply_boxes(boxes, (og_h, og_w))
-        #boxes = [[box[0] + pad_w, box[1] + pad_h, box[2] + pad_w, box[3] + pad_h] for box in boxes]
-
         point_coords = self.transform.apply_coords(point_coords, (og_h, og_w))
-        # point_coords[..., 0] += pad_w
-        # point_coords[..., 1] += pad_h
 
         return image, resized_masks, boxes, point_coords
 
@@ -179,7 +145,7 @@ class ResizeAndPad:
 def load_datasets(cfg, img_size):
     transform = ResizeAndPad(img_size)
 
-   # Ottiene il percorso del dataset
+    # Ottiene il percorso del dataset
     current_file_path = os.path.abspath(__file__)
     current_directory = os.path.dirname(current_file_path)
     dataset_path = os.path.join(current_directory, cfg.dataset.root_dir)
@@ -187,7 +153,8 @@ def load_datasets(cfg, img_size):
 
     train = COCODataset(root_dir=dataset_path,
                         annotation_file=annotations_path,
-                        transform=transform)
+                        transform=transform,
+                        seed=cfg.seed)
     train_dataloader = DataLoader(train,
                                   batch_size=cfg.batch_size,
                                   shuffle=True,
@@ -204,15 +171,5 @@ def load_datasets(cfg, img_size):
     #                             num_workers=cfg.num_workers,
     #                             collate_fn=collate_fn)
     val_dataloader = DataLoader # per ora restituisce una roba vuota
-    
-    # Visualize the dataset CAMBIARE 
-    # image, bboxes, masks = train[0]
-    # image = np.transpose(image, (1, 2, 0))
-    # for i in range(len(masks)):
-    #     plt.figure(figsize=(8, 8))
-    #     plt.imshow(image)
-    #     plt.imshow(masks[i], alpha=0.5, cmap='jet')  # Overlay masks on the image
-    #     plt.axis('off')
-    #     plt.show()
 
     return train_dataloader, val_dataloader

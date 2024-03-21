@@ -2,14 +2,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List
 
 from segment_anything import sam_model_registry
 from segment_anything import SamPredictor, SamAutomaticMaskGenerator
-import numpy as np
 
 
-class Model(nn.Module):
+class shape_SAM(nn.Module):
 
     def __init__(self, cfg):
         super().__init__()
@@ -83,11 +82,13 @@ class Model(nn.Module):
                 points = (image_record["point_coords"], image_record["point_labels"])
             else:
                 points = None
+
             sparse_embeddings, dense_embeddings = self.model.prompt_encoder(
                 points=points,
                 boxes=image_record.get("boxes", None),
                 masks=mask,
             )
+
             low_res_masks, iou_predictions = self.model.mask_decoder(
                 image_embeddings=curr_embedding.unsqueeze(0),
                 image_pe=self.model.prompt_encoder.get_dense_pe(),
@@ -95,12 +96,13 @@ class Model(nn.Module):
                 dense_prompt_embeddings=dense_embeddings,
                 multimask_output=multimask_output,
             )
+
             masks = self.model.postprocess_masks(
                 low_res_masks,
                 input_size=image_record["image"].shape[-2:],
                 original_size=image_record["original_size"],
             )
-            #masks = masks > self.mask_threshold # QUESTA MERDA E' L'ERRORE TI ELIMINA I GREDIENTI 
+
             outputs.append(
                 {
                     "masks": masks,
@@ -108,6 +110,7 @@ class Model(nn.Module):
                     "low_res_logits": low_res_masks,
                 }
             )
+
         return outputs
   
     def preprocess_masks(self, x: torch.Tensor) -> torch.Tensor:
@@ -118,6 +121,9 @@ class Model(nn.Module):
         padw = self.model.image_encoder.img_size//4 - w
         x = F.pad(x, (0, padw, 0, padh))
         return x
-
+    
     def get_predictor(self):
-        return SamAutomaticMaskGenerator(model = self.model, min_mask_region_area = 100)
+        return SamPredictor(model = self.model)
+
+    def get_automatic_predictor(self, min_mask_region_area = 0):
+        return SamAutomaticMaskGenerator(model = self.model, min_mask_region_area = min_mask_region_area)

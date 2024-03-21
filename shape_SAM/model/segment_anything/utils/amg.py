@@ -291,7 +291,7 @@ def remove_small_regions(
             fill_labels = [int(np.argmax(sizes)) + 1]
         
         # If the mask is smaller than area_thresh, remove it
-             
+        fill_labels = [i for i in fill_labels if sizes[i - 1] >= area_thresh]
 
     mask = np.isin(regions, fill_labels)
     return mask, True
