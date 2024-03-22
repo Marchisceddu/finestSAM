@@ -154,7 +154,7 @@ def load_datasets(cfg, img_size):
     train = COCODataset(root_dir=dataset_path,
                         annotation_file=annotations_path,
                         transform=transform,
-                        seed=cfg.seed)
+                        seed=42)
     train_dataloader = DataLoader(train,
                                   batch_size=cfg.batch_size,
                                   shuffle=True,

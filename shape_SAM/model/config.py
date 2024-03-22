@@ -1,13 +1,13 @@
 from box import Box
 
 config = {
-    "seed": 42,
+    "seed": 1337,
     "num_devices": "auto",
     "batch_size": 1,
     "num_workers": 2,
     "num_epochs": 200,
     "k_fold": 5,
-    "eval_interval": 99,
+    "eval_interval": 50,
     "out_dir": "sav",
     "opt": {
         "learning_rate": 8e-4,
