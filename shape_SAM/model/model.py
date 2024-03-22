@@ -1,3 +1,4 @@
+import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -15,8 +16,10 @@ class shape_SAM(nn.Module):
         self.cfg = cfg
 
     def setup(self):
-        # OTTENERE IL PERCORSO DEL SAV
-        self.model = sam_model_registry[self.cfg.model.type](checkpoint=self.cfg.model.checkpoint)
+        current_directory = os.path.dirname(os.path.abspath(__file__))
+        checkpoint = os.path.join(current_directory, self.cfg.out_dir, self.cfg.model.checkpoint)
+
+        self.model = sam_model_registry[self.cfg.model.type](checkpoint=checkpoint)
         self.model.train()
         if self.cfg.model.freeze.image_encoder:
             for param in self.model.image_encoder.parameters():

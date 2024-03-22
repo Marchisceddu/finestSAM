@@ -127,7 +127,7 @@ def train_sam(
                 separated_scores = [] # List to store the IoU predictions
                 for i in range(pred_masks.shape[1]):
                     separated_masks.append(pred_masks[:, i, :, :].unsqueeze(1))
-                    separated_scores.append(iou_prediction[:, i])
+                    separated_scores.append(iou_prediction[:, i].view(-1, 1))
 
                 # Find the class with the highest average score
                 best_score = 0
