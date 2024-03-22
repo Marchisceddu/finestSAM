@@ -122,25 +122,20 @@ def train_sam(
                 gt_mask = F.interpolate(data["mask_inputs"], data["original_size"], mode="bilinear", align_corners=False)
                 gt_mask = (gt_mask >= 0.5).float() # binarize the mask
 
-                # Separate the masks and scores for each class
-                separated_masks = [] # List to store the separated masks
-                separated_scores = [] # List to store the IoU predictions
+                separated_masks = [] # 3 maschere di output
+                separated_scores = [] # sono le IoU predictions
+
                 for i in range(pred_masks.shape[1]):
-                    separated_masks.append(pred_masks[:, i, :, :].unsqueeze(1))
-                    separated_scores.append(iou_prediction[:, i].view(-1, 1))
+                  separated_masks.append(pred_masks[:, i, :, :])
+                  separated_masks[i] = separated_masks[i].unsqueeze(1)
+                  separated_scores.append(iou_prediction[:,i]) # dovrebbe essere sbagliato, ha shape [6] e dovrebbe avere shape [6, 1], ma così sembra funzionare cambiando shape no  
 
-                # Find the class with the highest average score
                 best_score = 0
-                best_index = 0
                 for i in range(len(separated_scores)):
-                    score = torch.mean(separated_scores[i]).item()
-                    if score > best_score:
-                        best_score = score
-                        best_index = i
-
-                # Update the predictions and masks with the best class
-                iou_prediction = separated_scores[best_index]
-                pred_masks = separated_masks[best_index]
+                  if(best_score < torch.mean(separated_scores[i])):
+                    best_score = torch.mean(separated_scores[i]).item()
+                    iou_prediction = separated_scores[i]
+                    pred_masks = separated_masks[i]
 
                 ### STAMPA (ELIMINARE)
                 stamp = pred_masks[2] > 0.0 # elimina il gradiente dalla maschera predetta e trasforma in bool per essere stampata

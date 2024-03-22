@@ -21,9 +21,6 @@ class COCODataset(Dataset):
         self.coco = COCO(annotation_file)
         self.image_ids = list(self.coco.imgs.keys())
 
-        # Set seed for reproducibility
-        random.seed(self.seed) 
-
         # Filter out image_ids without any annotations
         self.image_ids = [image_id for image_id in self.image_ids if len(self.coco.getAnnIds(imgIds=image_id)) > 0]
 
@@ -31,6 +28,9 @@ class COCODataset(Dataset):
         return len(self.image_ids)
     
     def __getitem__(self, idx):
+        # Set the seed for reproducibility
+        np.random.seed(self.seed)
+
         # Restor the image from the folder
         image_id = self.image_ids[idx]
         image_info = self.coco.loadImgs(image_id)[0]
@@ -61,26 +61,30 @@ class COCODataset(Dataset):
             masks.append(mask)
             
             # Get the points
-            list_point_1 = []
             list_point_0 = []
+            list_point_1 = []
             for j in range(y, y + h):
                 for i in range(x, x + w):
-                    if 0 <= i < len(mask[0]) and 0 <= j < len(mask):
+                    if i >= 0 and i < len(mask[0]) and j >= 0 and j < len(mask):
                         if mask[j][i]:
                             list_point_1.append([i, j])
                         else:
                             list_point_0.append([i, j])
 
-            while len(list_point_1) < cfg.dataset.positive_points:
-                list_point_1.append(random.choice(list_point_1))
-            while len(list_point_0) < cfg.dataset.negative_points:
-                list_point_0.append(random.choice(list_point_0))
+            temp_list_point = []
+            for i in range(0, cfg.dataset.positive_points):
+                idx = np.random.randint(0, len(list_point_1))
+                temp_list_point.append(list_point_1[idx])
+            list_point_1 = temp_list_point.copy()
 
-            list_point_1 = random.sample(list_point_1, cfg.dataset.positive_points)
-            list_point_0 = random.sample(list_point_0, cfg.dataset.negative_points)
+            temp_list_point = []
+            for i in range(0, cfg.dataset.negative_points):
+                idx = np.random.randint(0, len(list_point_0))
+                temp_list_point.append(list_point_0[idx])
+            list_point_0 = temp_list_point.copy()
 
-            list_label_1 = [1] * len(list_point_1)
             list_label_0 = [0] * len(list_point_0)
+            list_label_1 = [1] * len(list_point_1)
 
             point_coords.append(list_point_1 + list_point_0)
             point_labels.append(list_label_1 + list_label_0)
@@ -109,7 +113,7 @@ def collate_fn(batch):
         "point_labels": point_labels[0],
         "boxes": boxes[0],
         "mask_inputs": masks[0],
-        "imo": imo[0]
+        "imo": imo[0] # ELIMINARE
     }
 
     return [batched_input]
@@ -154,7 +158,7 @@ def load_datasets(cfg, img_size):
     train = COCODataset(root_dir=dataset_path,
                         annotation_file=annotations_path,
                         transform=transform,
-                        seed=42)
+                        seed=cfg.seed)
     train_dataloader = DataLoader(train,
                                   batch_size=cfg.batch_size,
                                   shuffle=True,
