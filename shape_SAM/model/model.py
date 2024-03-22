@@ -4,8 +4,8 @@ import torch.nn.functional as F
 
 from typing import Any, Dict, List
 
-from segment_anything import sam_model_registry
-from segment_anything import SamPredictor, SamAutomaticMaskGenerator
+from .segment_anything import sam_model_registry
+from .segment_anything import SamPredictor, SamAutomaticMaskGenerator
 
 
 class shape_SAM(nn.Module):
@@ -15,6 +15,7 @@ class shape_SAM(nn.Module):
         self.cfg = cfg
 
     def setup(self):
+        # OTTENERE IL PERCORSO DEL SAV
         self.model = sam_model_registry[self.cfg.model.type](checkpoint=self.cfg.model.checkpoint)
         self.model.train()
         if self.cfg.model.freeze.image_encoder:

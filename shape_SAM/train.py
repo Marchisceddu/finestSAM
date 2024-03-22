@@ -9,7 +9,7 @@ import torch.nn.functional as F
 import matplotlib.pyplot as plt
 from box import Box
 from model.config import cfg
-from dataset import load_datasets
+from model.dataset import load_datasets
 from lightning.fabric.fabric import _FabricOptimizer
 from lightning.fabric.loggers import TensorBoardLogger
 from model.losses import DiceLoss

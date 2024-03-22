@@ -6,7 +6,7 @@ import numpy as np
 import torchvision.transforms as transforms
 import torch.nn.functional as F
 from pycocotools.coco import COCO
-from segment_anything.utils.transforms import ResizeLongestSide
+from .segment_anything.utils.transforms import ResizeLongestSide
 from torch.utils.data import DataLoader
 from torch.utils.data import Dataset
 from config import cfg
