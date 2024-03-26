@@ -73,13 +73,13 @@ def create_dataset(scegli_input = False, mostra_output = False):
     create_annotation_COCO(MASKS_PATH, JSON_PATH)
 
     if (mostra_output): 
-        display_COCO("../dataset/images/", "../dataset/annotations.json")
+        display_COCO("dataset/images/", "dataset/annotations.json")
     
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Crea un dataset a partire da file SHP e file TIF in formato COCO")
     parser.add_argument("--scegli_input", action="store_true", help="Se impostato a True, permette di scegliere la cartella di input", default=False)
-    parser.add_argument("--mostra_output", action="store_true", help="Se impostato a True, mostra l'output del dataset", default=False)
+    parser.add_argument("--mostra_output", action="store_true", help="Se impostato a True, mostra l'output del dataset", default=True)
     args = parser.parse_args()
 
     create_dataset(scegli_input=args.scegli_input, mostra_output=args.mostra_output)

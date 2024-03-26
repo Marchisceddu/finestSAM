@@ -93,14 +93,8 @@ def train_sam(
         iou_losses = AverageMeter()
         total_losses = AverageMeter()
         end = time.time()
-        validated = False
 
         for iter, batched_data in enumerate(train_dataloader):
-            if epoch > 1 and (epoch - 1) % cfg.eval_interval == 0 and not validated:
-                #validate(fabric, model, val_dataloader, epoch)
-                save(fabric, model, cfg, epoch)
-                validated = True
-
             data_time.update(time.time() - end)
 
             outputs = model(batched_input=batched_data, multimask_output=True)
@@ -110,8 +104,6 @@ def train_sam(
             for item in outputs:
                 batched_pred_masks.append(item["masks"])
                 iou_predictions.append(item["iou_predictions"])
-
-            num_masks = sum(len(pred_masks) for pred_masks in batched_pred_masks)
 
             loss_focal = torch.tensor(0., device=fabric.device)
             loss_dice = torch.tensor(0., device=fabric.device)
@@ -126,9 +118,8 @@ def train_sam(
                 separated_scores = [] # sono le IoU predictions
 
                 for i in range(pred_masks.shape[1]):
-                  separated_masks.append(pred_masks[:, i, :, :])
-                  separated_masks[i] = separated_masks[i].unsqueeze(1)
-                  separated_scores.append(iou_prediction[:,i]) # dovrebbe essere sbagliato, ha shape [6] e dovrebbe avere shape [6, 1], ma così sembra funzionare cambiando shape no  
+                  separated_masks.append(pred_masks[:, i, :, :].unsqueeze(1))
+                  separated_scores.append(iou_prediction[:,i].unsqueeze(1)) 
 
                 best_score = 0
                 for i in range(len(separated_scores)):
@@ -155,7 +146,7 @@ def train_sam(
                 batch_iou = calc_iou(pred_masks, gt_mask)
                 loss_focal += focal_loss(pred_masks, gt_mask)
                 loss_dice += dice_loss(pred_masks, gt_mask)
-                loss_iou += F.mse_loss(iou_prediction, batch_iou, reduction='sum') / num_masks
+                loss_iou += F.mse_loss(iou_prediction, batch_iou, reduction='sum')
 
             focal_alpha = 20.
             loss_total = focal_alpha * loss_focal + loss_dice + loss_iou
@@ -188,6 +179,10 @@ def train_sam(
                 'dice loss': dice_losses.val,
             }
             fabric.log_dict(log_info, step=steps)
+
+        if (epoch > 1 and cfg.eval_interval > 0 and epoch % cfg.eval_interval == 0) or (epoch == cfg.num_epochs):
+            #validate(fabric, model, val_dataloader, epoch)
+            save(fabric, model, cfg, epoch)
 
 
 def configure_opt(cfg: Box, model: shape_SAM):
