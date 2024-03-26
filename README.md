@@ -19,7 +19,7 @@
     ```
 
 * Eseguire il file [create_dataset/__init__.py](https://github.com/Marchisceddu/Progetto_Urbismap/blob/main/create_dataset/__init__.py):
- 
+
     Args (opzionali):
     ```python
         --scegli_input (bool) default:False # Se True, permette di scegliere la cartella di input 
@@ -33,3 +33,17 @@
        python -m create_dataset --scegli_input False --mostra_output True
 
   questo creerà il dataset in formato COCO all'interno della cartella [dataset/](https://github.com/Marchisceddu/Progetto_Urbismap/tree/main/dataset/)
+
+# Setup:
+
+* E' necessario scaricare il checkpoint del modello SAM, la spiegazione è presente in [shape_SAM/sav/](https://github.com/Marchisceddu/Progetto_Urbismap/blob/main/shape_SAM/sav/)
+
+* E' presente un file di configurazione -> [shape_SAM/model/config.py](https://github.com/Marchisceddu/Progetto_Urbismap/blob/main/shape_SAM/model/config.py) (permette di poter modificare diversi aspetti del modello e del train)
+
+# Train:
+
+*  Eseguire il file [shape_SAM/train.py](https://github.com/Marchisceddu/Progetto_Urbismap/blob/main/shape_SAM/train.py):
+
+    Run:
+
+        python shape_SAM/train.py

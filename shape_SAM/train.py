@@ -85,7 +85,7 @@ def train_sam(
     focal_loss = FocalLoss()
     dice_loss = DiceLoss()
 
-    for epoch in range(1, cfg.num_epochs):
+    for epoch in range(1, cfg.num_epochs + 1):
         batch_time = AverageMeter()
         data_time = AverageMeter()
         focal_losses = AverageMeter()
@@ -96,7 +96,7 @@ def train_sam(
         validated = False
 
         for iter, batched_data in enumerate(train_dataloader):
-            if epoch > 1 and epoch % cfg.eval_interval == 0 and not validated:
+            if epoch > 1 and (epoch - 1) % cfg.eval_interval == 0 and not validated:
                 #validate(fabric, model, val_dataloader, epoch)
                 save(fabric, model, cfg, epoch)
                 validated = True
@@ -235,7 +235,7 @@ def main(cfg: Box) -> None:
     model, optimizer = fabric.setup(model, optimizer)
 
     train_sam(cfg, fabric, model, optimizer, scheduler, train_data, val_data)
-    validate(fabric, model, train_data, epoch=0)
+    #validate(fabric, model, train_data, epoch=0)
 
 
 if __name__ == "__main__":

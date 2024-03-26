@@ -4,7 +4,7 @@ import numpy as np
 import lightning as L
 import matplotlib.pyplot as plt
 from lightning.fabric.loggers import TensorBoardLogger
-from model.model import Model
+from model.model import shape_SAM
 from model.config import cfg
 
 
@@ -39,7 +39,7 @@ def pred(path):
     fabric.seed_everything(cfg.seed + fabric.global_rank)
 
     with fabric.device:
-        model = Model(cfg)
+        model = shape_SAM(cfg)
         model.setup()
         model.to(fabric.device)
 
