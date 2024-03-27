@@ -1,7 +1,5 @@
-import torch
-import random
-from torchvision.utils import draw_bounding_boxes
-from torchvision.utils import draw_segmentation_masks
+import numpy as np
+import matplotlib.pyplot as plt
 
 
 class AverageMeter:

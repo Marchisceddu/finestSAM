@@ -1,10 +1,8 @@
 import os
 import cv2
-import numpy as np
 import lightning as L
 import matplotlib.pyplot as plt
 from model.utils import show_anns
-from lightning.fabric.loggers import TensorBoardLogger
 from model.model import shape_SAM
 from model.config import cfg
 
