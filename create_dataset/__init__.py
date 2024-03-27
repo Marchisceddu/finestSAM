@@ -20,25 +20,26 @@ JSON_PATH = os.path.join(ROOT_PATH, "../dataset/annotations.json")
 
 def create_dataset(scegli_input = False, mostra_output = False):
     '''
-    Crea un dataset a partire da file SHP e file TIF in formato COCO
+    Create a dataset from SHP and TIF files in COCO format
 
     Args:
-        scegli_input (bool): Se True, permette di scegliere la cartella di input 
-                             (deve essere formattata come la cartella INPUT_PATH)
-        mostra_output (bool): Se True, mostra l'output del dataset
+        scegli_input (bool): If True, allows you to choose the input folder 
+                            (must be formatted like the INPUT_PATH folder) 
+                         
+        mostra_output (bool): If True, shows the output of the dataset
     '''
 
     if (scegli_input):
-        print("Seleziona la cartella di input")
+        print("Seleziona la cartella di input:")
         input_path = get_folder_path()
     else:
         input_path = INPUT_PATH
 
-    # Creazione barra di caricamento che conta il numero di immagini da processare
+    # Creating a progress bar
     num_folders = sum(1 for item in os.listdir(input_path) if os.path.isdir(os.path.join(input_path, item)))
     bar_folder = tqdm(total = num_folders, desc = "Processo immagini", position = 0, leave = False)
 
-    # Elimina il vecchio dataset e crea delle nuove cartelle
+    # Delete the dataset folder if it already exists
     if os.path.exists(DATASET_PATH):
         os.system(f"rm -r {DATASET_PATH}")
     os.makedirs(DATASET_PATH, exist_ok = True)
@@ -49,16 +50,16 @@ def create_dataset(scegli_input = False, mostra_output = False):
         shp_file_path = ""
         tif_file_path = ""
 
-        # Controllo se è una directory
+        # Check if the folder is a directory
         if (os.path.isdir(os.path.join(input_path, folder))):
-            # Ciclo per i file per ottenere lo shape
+            # Iterate over the files to get the shp
             for file in os.listdir(os.path.join(input_path, folder)):
                 if (file.endswith(".shp")):
                     shp_file_path = os.path.join(input_path, folder, file)
                     break
             
             if (shp_file_path != ""):
-                # Ciclo per i file per ottenere i tif
+                # iterate over the files to get the tif
                 for file in os.listdir(os.path.join(input_path, folder)):
                     if (file.endswith(".tif") or file.endswith(".tiff")):
                         tif_file_path = os.path.join(input_path, folder, file)
@@ -66,10 +67,10 @@ def create_dataset(scegli_input = False, mostra_output = False):
 
         bar_folder.update(1)
 
-    # Elimino la cartella delle maschere binarie tif
+    # Delete the binary mask folder
     os.system(f"rm -r {MASKS_TIF_PATH}")
 
-    # Creazione delle delle annotazioni COCO
+    # Create the COCO annotation file
     create_annotation_COCO(MASKS_PATH, JSON_PATH)
 
     if (mostra_output): 

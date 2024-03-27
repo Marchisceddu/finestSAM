@@ -23,11 +23,17 @@ class AverageMeter:
         self.avg = self.sum / self.count
 
 
-def draw_image(image, masks, boxes, labels, alpha=0.4):
-    image = torch.from_numpy(image).permute(2, 0, 1)
-    if boxes is not None:
-        image = draw_bounding_boxes(image, boxes, colors=['red'] * len(boxes), labels=labels, width=2)
-    if masks is not None:
-        colors = [tuple(random.randint(0, 255) for _ in range(3)) for _ in range(len(masks))]
-        image = draw_segmentation_masks(image, masks=masks, colors=colors, alpha=alpha)
-    return image.numpy().transpose(1, 2, 0)
+def show_anns(anns, opacity=0.35):
+    if len(anns) == 0:
+        return
+    sorted_anns = sorted(anns, key=(lambda x: x['area']), reverse=True)
+    ax = plt.gca()
+    ax.set_autoscale_on(False)
+
+    img = np.ones((sorted_anns[0]['segmentation'].shape[0], sorted_anns[0]['segmentation'].shape[1], 4))
+    img[:,:,3] = 0
+    for ann in sorted_anns:
+        m = ann['segmentation']
+        color_mask = np.concatenate([np.random.random(3), [opacity]])
+        img[m] = color_mask
+    ax.imshow(img)

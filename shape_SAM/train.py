@@ -116,8 +116,8 @@ def train_sam(
                 gt_mask = F.interpolate(data["mask_inputs"], data["original_size"], mode="bilinear", align_corners=False)
                 gt_mask = (gt_mask >= 0.5).float() # binarize the mask
 
-                separated_masks = [] # 3 maschere di output
-                separated_scores = [] # sono le IoU predictions
+                separated_masks = [] # 3 output masks
+                separated_scores = [] # the iou score for each mask
 
                 for i in range(pred_masks.shape[1]):
                   separated_masks.append(pred_masks[:, i, :, :].unsqueeze(1))

@@ -93,7 +93,7 @@ def images_annotations_info(maskpath):
         
         # Ottieni una lista dei nomi delle cartelle all'interno del percorso della categoria corrente
         category_folders = [folder for folder in os.listdir(category_path) if os.path.isdir(os.path.join(category_path, folder))]
-        bar_images = tqdm(total = len(category_folders), desc = "Creazione annotazioni COCO", position = 0, leave = False)
+        bar_images = tqdm(total = len(category_folders), desc = "Creating COCO annotations...", position = 0, leave = False)
 
         for image_folder in category_folders:
             original_file_name = f'{os.path.basename(image_folder)}.{ORIGINAL_EXT}'
@@ -102,7 +102,7 @@ def images_annotations_info(maskpath):
             all_contours = []
             height, width = 0, 0
 
-            bar_image = tqdm(total = len(glob.glob(os.path.join(category_path, image_folder, f'*.{MASK_EXT}'))), desc = f"Elaborazione immagine {image_folder}", position = 1, leave = False)
+            bar_image = tqdm(total = len(glob.glob(os.path.join(category_path, image_folder, f'*.{MASK_EXT}'))), desc = f"Image processing... {image_folder}", position = 1, leave = False)
 
             for mask_image in glob.glob(os.path.join(category_path, image_folder, f'*.{MASK_EXT}')):
                 bar_image.update(1)

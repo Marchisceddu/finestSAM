@@ -9,7 +9,7 @@ from PIL import Image
 from tqdm import tqdm
 
 
-# Definizione dei percorsi
+# Define the paths
 ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
 ORIGIN_IMG_PATH = os.path.join(ROOT_PATH, "../../dataset/images/")
 OUT_TIF_PATH = os.path.join(ROOT_PATH, "../binary_mask/")
@@ -18,52 +18,54 @@ OUT_PNG_PATH = os.path.join(ROOT_PATH, "../../dataset/masks/shape/")
 
 def shp_plot(shapefile_path):
     """
-    Traccia i poligoni contenuti in un file shapefile.
+    Draws the polygons of the shapes from a *.shp..
 
     Args:
-        shapefile_path: Il percorso del file shapefile da tracciare.
+        shapefile_path: the path of the shapefile to plot
     """
     
-    # Leggi il file shapefile
+    # Read shapefile
     shp_file_path = shapefile_path
     gdf = gpd.read_file(shp_file_path)
 
-    # Prepara il tracciamento
+    # Prepare the plot
     fig, ax = plt.subplots()
 
-    # Itera su ogni poligono nel GeoDataFrame
+    # Iterate over the geometries and plot them
     for idx, geom in gdf.geometry.items():
         if geom.geom_type == 'Polygon':
-            # Se è un singolo poligono, estrai le coordinate esterne e tracciale
+            # If it's a polygon, plot the exterior
             x, y = geom.exterior.xy
             ax.plot(x, y, color=plt.cm.viridis(idx / len(gdf)))
 
-    # Aggiungi legenda e titolo
-    plt.title("Poligoni dal file shapefile")
+    plt.title("Polygons from the shapefile")
     plt.xlabel("Longitudine")
     plt.ylabel("Latitudine")
-    plt.colorbar(plt.cm.ScalarMappable(cmap='viridis'), label='Indice')
-
-    # Mostra il plot
+    plt.colorbar(plt.cm.ScalarMappable(cmap='viridis'), label='Index')
     plt.show()
+
+
+
+
+
 
 
 def convert_tif_to_png(file_path, output_path, file_name = -1):
     """
-    Converte un file TIF in PNG.
-
+    Convert a TIF file to a PNG file
+    
     Args:
-        file_path: Il percorso del file TIF da convertire.
-        output_path: Il percorso della cartella di output per i file PNG.
-        file_name: Il nome del file PNG di output. Se non specificato, verrà assegnato un nome automatico.
+        file_path: The path of the TIF file to convert.
+        output_path: The output folder path for the PNG files.
+        file_name: The output PNG file name. If not specified, an automatic name will be assigned.
     """
 
     with rasterio.open(file_path) as src:
-        # Leggi il raster
+        # Read the raster data
         data = src.read()
 
-        # Verifica se l'immagine TIF è a colori RGB
-        is_rgb = data.shape[0] == 3  # Se il primo asse ha dimensione 3, è un'immagine RGB
+        # Verify if the image is RGB
+        is_rgb = data.shape[0] == 3  # If the raster has 3 bands, it is RGB
 
         # Normalizza i valori del raster
         max_value = np.max(data)
@@ -89,11 +91,11 @@ def convert_tif_to_png(file_path, output_path, file_name = -1):
 
 def tif_to_png(input_path, output_path):
     """
-    Converte un file o una cartella TIF in PNG.
+    Convert a TIF file or all TIF files in a folder to PNG files.
 
     Args:
-        input_path: Il percorso del file o della cartella TIF da convertire.
-        output_path: Il percorso della cartella di output per i file PNG.
+        input_path: The path of the TIF file or folder to convert.
+        output_path: The output folder path for the PNG files.
     """
 
     # Crea la cartella se non esiste
@@ -102,7 +104,7 @@ def tif_to_png(input_path, output_path):
     if os.path.isfile(input_path): # Se è un file, lo converte
         convert_tif_to_png(input_path, output_path)
     elif os.path.isdir(input_path): # Se è una cartella, converte tutti i file TIF al suo interno
-        bar = tqdm(total = len(os.listdir(input_path)), desc = "Conversione da .tif a .png", position = 1, leave = False)
+        bar = tqdm(total = len(os.listdir(input_path)), desc = "Converting .tif to .png", position = 1, leave = False)
         idx = 0
         for filename in os.listdir(input_path):
             bar.update(1)
@@ -110,47 +112,47 @@ def tif_to_png(input_path, output_path):
                 convert_tif_to_png(os.path.join(input_path, filename), output_path, file_name = idx)
                 idx += 1
     else:
-        raise ValueError(f"Percorso non valido: {input_path}")
+        raise ValueError(f"Path not valid: {input_path}")
 
 
 def shp_to_bm(tif_file_path, shp_file_path, output_folder):
     """
-    Crea una maschera binaria per ogni forma georeferenziata in un file shapefile.
-
+    Create binary masks from a TIF file (georeferenced) and a shapefile.
+    
     Args:
-        tif_file_path: Il percorso del file TIF da cui creare le maschere binarie.
-        shp_file_path: Il percorso del file shapefile contenente le forme georeferenziate.
-        output_folder: La cartella di output per i file TIFF di maschera binaria.
+        tif_file_path: The path of the TIF file containing the georeferenced shapes.
+        shp_file_path: The path of the shapefile containing the shapes.
+        output_folder: The output folder path for the binary masks.
     """
 
-    # Leggi il file shapefile
+    # Read the shapefile
     gdf = gpd.read_file(shp_file_path)
 
-    # Carica il file TIFF
+    # Use rasterio to read the TIF file
     with rasterio.open(tif_file_path) as src:
         profile = src.profile
         transform = src.transform
         crs = src.crs
-        data = src.read(1)  # Leggi il raster
+        data = src.read(1)  # Read the first band
 
-    bar = tqdm(total = len(gdf), desc = "Creazione maschere binarie tif", position = 1, leave = False)
+    bar = tqdm(total = len(gdf), desc = "Creating binary tif masks..", position = 1, leave = False)
     minx, miny, maxx, maxy = src.bounds
     tif_bounds = box(minx, miny, maxx, maxy)
 
-    # Creare una maschera binaria per ogni forma georeferenziata
+    # Create a binary mask for each shape
     for idx, geom in gdf.geometry.items():
         bar.update(1)
         try:
             if geom.geom_type == 'Polygon':
-                # Controllo se la geometria si sovrappone all'estensione dell'immagine
+                # Check if the shape intersects the TIF bounds
                 if geom.intersects(tif_bounds):
-                    # Creare una matrice vuota della stessa forma del raster
+                    # Create a mask with the same shape as the TIF data
                     mask = np.zeros_like(data, dtype=np.uint8)
 
-                    # Genera una forma (geometria) per la singola forma
+                    # Create a shape for the form
                     shapes = ((geom, 1),)
 
-                    # Creare una maschera per la forma
+                    # Create the mask
                     mask = features.rasterize(
                         shapes = shapes,
                         out = mask,
@@ -160,13 +162,13 @@ def shp_to_bm(tif_file_path, shp_file_path, output_folder):
                         default_value = 0
                     )
 
-                    # Crea la cartella se non esiste
+                    # Create the output folder if it does not exist
                     os.makedirs(f"{output_folder}", exist_ok = True)
 
-                    # Imposta il percorso per il file TIFF di output
+                    # Set the output path for the binary mask
                     output_tif_path = f"{output_folder}/output_mask_{idx}.tif"
 
-                    # Scrivi la maschera nel file TIFF
+                    # Write the mask to a new TIF file
                     with rasterio.open(output_tif_path, 'w', **profile) as dst:
                         dst.write(mask, 1)
         except AttributeError:
@@ -174,16 +176,16 @@ def shp_to_bm(tif_file_path, shp_file_path, output_folder):
 
 
 def crete_binary_mask(tif_file_path, shp_file_path):
-    # Trova il nome dell'immagine a cui si riferisce
+    # Find the name of the image
     image_name = len(os.listdir(ORIGIN_IMG_PATH))
     out_tif = f"{OUT_TIF_PATH}/{image_name}"
     out_png = f"{OUT_PNG_PATH}/{image_name}"
 
-    # Converte il file tif (immagine originale) selezionato in file png
+    # Convert the TIF file to a PNG file
     tif_to_png(tif_file_path, ORIGIN_IMG_PATH)
 
-    # Crea una maschera binaria per ogni forma georeferenziata
+    # Create the binary mask from the TIF file and the shapefile
     shp_to_bm(tif_file_path, shp_file_path, out_tif)
 
-    # Converte tutti i file tif (maschere binarie) in file png
+    # Convert the binary mask to a PNG file
     tif_to_png(out_tif, out_png)
