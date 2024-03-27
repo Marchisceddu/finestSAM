@@ -78,7 +78,7 @@ class shape_SAM(nn.Module):
         input_images = torch.stack([self.model.preprocess(x["image"]) for x in batched_input], dim=0)
         image_embeddings = self.model.image_encoder(input_images)
 
-        input_masks = torch.stack([self.preprocess_masks(x["mask_inputs"]) for x in batched_input], dim=0)
+        input_masks = [self.preprocess_masks(x["mask_inputs"]) for x in batched_input]
 
         outputs = []
         for image_record, curr_embedding, mask in zip(batched_input, image_embeddings, input_masks):

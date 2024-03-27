@@ -42,3 +42,13 @@ class DiceLoss(nn.Module):
         dice = (2. * intersection + smooth) / (inputs.sum() + targets.sum() + smooth)
 
         return 1 - dice
+    
+    
+def calc_iou(pred_mask: torch.Tensor, gt_mask: torch.Tensor):
+    pred_mask = (pred_mask >= 0.5).float()
+    intersection = torch.sum(torch.mul(pred_mask, gt_mask), dim=(2, 3))
+    union = torch.sum(pred_mask, dim=(2,3)) + torch.sum(gt_mask, dim=(2, 3)) - intersection
+    epsilon = 1e-7
+    batch_iou = intersection / (union + epsilon)
+
+    return batch_iou

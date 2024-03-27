@@ -23,16 +23,6 @@ class AverageMeter:
         self.avg = self.sum / self.count
 
 
-def calc_iou(pred_mask: torch.Tensor, gt_mask: torch.Tensor):
-    pred_mask = (pred_mask >= 0.5).float()
-    intersection = torch.sum(torch.mul(pred_mask, gt_mask), dim=(2, 3))
-    union = torch.sum(pred_mask, dim=(2,3)) + torch.sum(gt_mask, dim=(2, 3)) - intersection
-    epsilon = 1e-7
-    batch_iou = intersection / (union + epsilon)
-
-    return batch_iou
-
-
 def draw_image(image, masks, boxes, labels, alpha=0.4):
     image = torch.from_numpy(image).permute(2, 0, 1)
     if boxes is not None:

@@ -12,12 +12,14 @@ from model.config import cfg
 from model.dataset import load_datasets
 from lightning.fabric.fabric import _FabricOptimizer
 from lightning.fabric.loggers import TensorBoardLogger
-from model.losses import DiceLoss
-from model.losses import FocalLoss
 from model.model import shape_SAM
 from torch.utils.data import DataLoader
 from model.utils import AverageMeter
-from model.utils import calc_iou
+from model.losses import (
+    calc_iou,
+    DiceLoss,
+    FocalLoss
+)
 
 
 torch.set_float32_matmul_precision('high')
