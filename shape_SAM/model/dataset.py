@@ -104,28 +104,11 @@ class COCODataset(Dataset):
 
 
 def collate_fn(batch):
-    # batched_data = []
-
-    # images, original_sizes, point_coords, point_labels, boxes, masks, imos = zip(*batch)
-    # for image, original_size, point_coord, point_label, box, mask, imo in zip(images, original_sizes, point_coords, point_labels, boxes, masks, imos):
-
-    #   data = {
-    #       "image": image,
-    #       "original_size": original_size,
-    #       "point_coords": point_coord,
-    #       "point_labels": point_label,
-    #       "boxes": box,
-    #       "mask_inputs": mask,
-    #       "imo": imo
-    #   }
-    #   batched_data.append(data)
-
-    # return batched_data
     batched_data = []
 
     for data in batch:
         image, original_size, point_coord, point_label, box, mask, imo = data
-        
+
         batched_data.append({
             "image": image,
             "original_size": original_size,
