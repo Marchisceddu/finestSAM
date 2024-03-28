@@ -47,3 +47,11 @@
     Run:
 
         python shape_SAM/train.py
+
+# Predizioni automatiche:
+
+*  Eseguire il file [shape_SAM/pred.py](https://github.com/Marchisceddu/Progetto_Urbismap/blob/main/shape_SAM/pred.py):
+
+    Run:
+
+        python shape_SAM/pred.py

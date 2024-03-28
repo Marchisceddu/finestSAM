@@ -36,6 +36,7 @@ class shape_SAM(nn.Module):
         self,
         batched_input: List[Dict[str, Any]],
         multimask_output: bool,
+        train_automatic: bool = True,
     ) -> List[Dict[str, torch.Tensor]]:
         """
         Predicts masks end-to-end from provided images and prompts.
@@ -87,9 +88,14 @@ class shape_SAM(nn.Module):
             else:
                 points = None
 
+            if train_automatic:
+                boxes = None
+            else:
+                boxes = image_record.get("boxes", None)
+
             sparse_embeddings, dense_embeddings = self.model.prompt_encoder(
                 points=points,
-                boxes=image_record.get("boxes", None),
+                boxes=boxes,
                 masks=mask,
             )
 
