@@ -44,11 +44,18 @@ class DiceLoss(nn.Module):
         return 1 - dice
     
     
-def calc_iou(pred_mask: torch.Tensor, gt_mask: torch.Tensor):
-    pred_mask = (pred_mask >= 0.5).float()
-    intersection = torch.sum(torch.mul(pred_mask, gt_mask), dim=(2, 3))
-    union = torch.sum(pred_mask, dim=(2,3)) + torch.sum(gt_mask, dim=(2, 3)) - intersection
-    epsilon = 1e-7
-    batch_iou = intersection / (union + epsilon)
 
-    return batch_iou
+class Calc_iou(nn.Module):
+
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, pred_mask: torch.Tensor, gt_mask: torch.Tensor):
+      pred_mask = torch.round(pred_mask - 0.5)
+      pred_mask = torch.clamp(pred_mask, min=0.0, max=1.0).float()
+      intersection = torch.sum(torch.mul(pred_mask, gt_mask), dim=(2, 3))
+      union = torch.sum(pred_mask, dim=(2,3)) + torch.sum(gt_mask, dim=(2, 3)) - intersection
+      epsilon = 1e-7
+      batch_iou = intersection / (union + epsilon)
+
+      return batch_iou

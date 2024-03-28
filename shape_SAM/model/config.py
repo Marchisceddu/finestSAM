@@ -7,7 +7,7 @@ config = {
     "num_workers": 2,
     "num_epochs": 200,
     "k_fold": 5,
-    "eval_interval": 50,
+    "eval_interval": 200,
     "out_dir": "sav",
     "opt": {
         "learning_rate": 8e-4,
@@ -28,8 +28,8 @@ config = {
     "dataset": {
         "root_dir": "../../dataset/images",
         "annotation_file": "../../dataset/annotations.json",
-        "positive_points": 5,
-        "negative_points": 5,
+        "positive_points": 9,
+        "negative_points": 9,
         
         "train": {
             "root_dir": "../../dataset/train",

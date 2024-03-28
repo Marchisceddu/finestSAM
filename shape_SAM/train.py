@@ -16,7 +16,7 @@ from model.model import shape_SAM
 from torch.utils.data import DataLoader
 from model.utils import AverageMeter
 from model.losses import (
-    calc_iou,
+    Calc_iou,
     DiceLoss,
     FocalLoss
 )
@@ -86,6 +86,7 @@ def train_sam(
 
     focal_loss = FocalLoss()
     dice_loss = DiceLoss()
+    calc_iou = Calc_iou()
 
     for epoch in range(1, cfg.num_epochs + 1):
         batch_time = AverageMeter()

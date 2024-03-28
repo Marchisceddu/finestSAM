@@ -72,14 +72,16 @@ class COCODataset(Dataset):
                             list_point_0.append([i, j])
 
             temp_list_point = []
-            for i in range(0, cfg.dataset.positive_points):
-                idx = np.random.randint(0, len(list_point_1))
+            range_point_1 = len(list_point_1) // cfg.dataset.positive_points # take the points on a range of the mask for the positive points
+            for i in range(1, cfg.dataset.positive_points + 1):
+                idx = i * range_point_1
                 temp_list_point.append(list_point_1[idx])
             list_point_1 = temp_list_point.copy()
 
             temp_list_point = []
-            for i in range(0, cfg.dataset.negative_points):
-                idx = np.random.randint(0, len(list_point_0))
+            range_point_0 = len(list_point_0) // cfg.dataset.negative_points
+            for i in range(1, cfg.dataset.negative_points + 1):
+                idx = i * range_point_0
                 temp_list_point.append(list_point_0[idx])
             list_point_0 = temp_list_point.copy()
 
