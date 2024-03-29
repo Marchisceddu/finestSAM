@@ -117,19 +117,16 @@ def train_sam(
                 gt_mask = F.interpolate(data["mask_inputs"], data["original_size"], mode="bilinear", align_corners=False)
                 gt_mask = (gt_mask >= 0.5).float() # binarize the mask
 
-                separated_masks = [] # 3 output masks
-                separated_scores = [] # the iou score for each mask
-
-                for i in range(pred_masks.shape[1]):
-                  separated_masks.append(pred_masks[:, i, :, :].unsqueeze(1))
-                  separated_scores.append(iou_prediction[:,i].unsqueeze(1)) 
+                separated_masks = torch.unbind(pred_masks, dim=1) # 3 output masks
+                separated_scores = torch.unbind(iou_prediction, dim=1) # scores for each mask
 
                 best_score = 0
-                for i in range(len(separated_scores)):
+                for i in range(0,(len(separated_scores))):
                   if(best_score < torch.mean(separated_scores[i])):
                     best_score = torch.mean(separated_scores[i]).item()
-                    iou_prediction = separated_scores[i]
-                    pred_masks = separated_masks[i]
+                    iou_prediction = separated_scores[i].unsqueeze(1)
+                    pred_masks = separated_masks[i].unsqueeze(1)
+
 
                 ### STAMPA (ELIMINARE)
                 stamp = pred_masks[2] > 0.0 # elimina il gradiente dalla maschera predetta e trasforma in bool per essere stampata

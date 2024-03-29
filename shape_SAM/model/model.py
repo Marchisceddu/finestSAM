@@ -82,7 +82,7 @@ class shape_SAM(nn.Module):
         input_masks = [self.preprocess_masks(x["mask_inputs"]) for x in batched_input]
 
         outputs = []
-        for image_record, curr_embedding, mask in zip(batched_input, image_embeddings, input_masks):
+        for image_record, curr_embedding, masks in zip(batched_input, image_embeddings, input_masks):
             if "point_coords" in image_record:
                 points = (image_record["point_coords"], image_record["point_labels"])
             else:
@@ -96,7 +96,7 @@ class shape_SAM(nn.Module):
             sparse_embeddings, dense_embeddings = self.model.prompt_encoder(
                 points=points,
                 boxes=boxes,
-                masks=mask,
+                masks=masks,
             )
 
             low_res_masks, iou_predictions = self.model.mask_decoder(
