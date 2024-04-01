@@ -212,7 +212,11 @@ def main(cfg: Box) -> None:
                       strategy="auto",
                       loggers=[TensorBoardLogger(cfg.out_dir, name="loggers_shape_SAM")])
     fabric.launch()
-    fabric.seed_everything(cfg.seed + fabric.global_rank)
+    #fabric.seed_everything(cfg.seed + fabric.global_rank)
+    #VERIFICARE CHE SENZA QUESTO DIA GLI STESSI RISULTATI
+
+    fabric.seed_everything(cfg.seed)
+
 
     if fabric.global_rank == 0:
         os.makedirs(cfg.out_dir, exist_ok=True)
