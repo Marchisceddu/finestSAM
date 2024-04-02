@@ -120,12 +120,13 @@ def train_sam(
                 separated_masks = torch.unbind(pred_masks, dim=1) # 3 output masks
                 separated_scores = torch.unbind(iou_prediction, dim=1) # scores for each mask
 
-                best_score = 0
-                for i in range(0,(len(separated_scores))):
-                  if(best_score < torch.mean(separated_scores[i])):
-                    best_score = torch.mean(separated_scores[i]).item()
-                    iou_prediction = separated_scores[i].unsqueeze(1)
-                    pred_masks = separated_masks[i].unsqueeze(1)
+                # Calcola la media di ciascun tensore nella lista
+                separated_scores_means = [torch.mean(t) for t in separated_scores]
+                # Trova l'indice del tensore con la media migliore
+                best_index = torch.argmax(torch.tensor(separated_scores_means))
+
+                pred_masks = separated_masks[best_index].unsqueeze(1)
+                iou_prediction = separated_scores[best_index].unsqueeze(1)
 
 
                 ### STAMPA (ELIMINARE)
@@ -163,6 +164,7 @@ def train_sam(
             dice_losses.update(loss_dice.item(), cfg.batch_size)
             iou_losses.update(loss_iou.item(), cfg.batch_size)
             total_losses.update(loss_total.item(), cfg.batch_size)
+            best_score = torch.mean(iou_prediction)
 
             fabric.print(f'Epoch: [{epoch}][{iter+1}/{len(train_dataloader)}]'
                          f' | Time [{batch_time.val:.3f}s ({batch_time.avg:.3f}s)]'
