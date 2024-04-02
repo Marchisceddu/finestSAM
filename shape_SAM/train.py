@@ -121,9 +121,11 @@ def train_sam(
                 separated_scores = torch.unbind(iou_prediction, dim=1) # scores for each mask
 
                 # Calcola la media di ciascun tensore nella lista
-                separated_scores_means = [torch.mean(t) for t in separated_scores]
+                # separated_scores_means = [torch.mean(t) for t in separated_scores]
                 # Trova l'indice del tensore con la media migliore
-                best_index = torch.argmax(torch.tensor(separated_scores_means))
+
+                batch_iou_means = [torch.mean(calc_iou(mask,gt_mask)) for mask in separated_masks]
+                best_index = torch.argmax(torch.tensor(batch_iou_means))
 
                 pred_masks = separated_masks[best_index].unsqueeze(1)
                 iou_prediction = separated_scores[best_index].unsqueeze(1)
@@ -147,7 +149,7 @@ def train_sam(
                 batch_iou = calc_iou(pred_masks, gt_mask)
                 loss_focal += focal_loss(pred_masks, gt_mask)
                 loss_dice += dice_loss(pred_masks, gt_mask)
-                loss_iou += F.mse_loss(iou_prediction, batch_iou, reduction='sum')
+                loss_iou += F.mse_loss(iou_prediction, batch_iou, reduction='mean')
 
             focal_alpha = 20.
             loss_total = focal_alpha * loss_focal + loss_dice + loss_iou
