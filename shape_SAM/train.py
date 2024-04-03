@@ -107,6 +107,8 @@ def train_sam(
             for item in outputs:
                 batched_pred_masks.append(item["masks"])
                 iou_predictions.append(item["iou_predictions"])
+                
+            num_masks = sum(len(pred_mask) for pred_mask in batched_pred_masks)
 
             loss_focal = torch.tensor(0., device=fabric.device)
             loss_dice = torch.tensor(0., device=fabric.device)
@@ -147,8 +149,8 @@ def train_sam(
                 ### FINE STAMPA
 
                 batch_iou = calc_iou(pred_masks, gt_mask)
-                loss_focal += focal_loss(pred_masks, gt_mask)
-                loss_dice += dice_loss(pred_masks, gt_mask)
+                loss_focal += focal_loss(pred_masks, gt_mask, num_masks)
+                loss_dice += dice_loss(pred_masks, gt_mask, num_masks)
                 loss_iou += F.mse_loss(iou_prediction, batch_iou, reduction='mean')
 
             focal_alpha = 20.
