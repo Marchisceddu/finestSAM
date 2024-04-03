@@ -87,10 +87,17 @@ class Calc_iou(nn.Module):
         super().__init__()
 
     def forward(self, pred_mask: torch.Tensor, gt_mask: torch.Tensor):
-      pred_mask = (pred_mask >= 0.5).float()
-      intersection = torch.sum(torch.mul(pred_mask, gt_mask), dim=(2, 3))
-      union = torch.sum(pred_mask, dim=(2,3)) + torch.sum(gt_mask, dim=(2, 3)) - intersection
-      epsilon = 1e-7
-      batch_iou = intersection / (union + epsilon)
+         
+        pred_mask = (pred_mask >= 0.5).float()
+        pred_mask = pred_mask.squeeze()
+        gt_mask = gt_mask.squeeze()
+        
+        pred_mask = pred_mask.flatten(1)
+        gt_mask = gt_mask.flatten(1)
+            
+        intersection = (pred_mask * gt_mask).sum(1)
+        union = pred_mask.sum(1) + gt_mask.sum(1) - intersection
+        epsilon = 1e-7
+        batch_iou = intersection / (union + epsilon)
 
-      return batch_iou
+        return batch_iou
