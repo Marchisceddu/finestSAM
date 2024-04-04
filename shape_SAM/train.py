@@ -116,6 +116,7 @@ def train_sam(
 
             for pred_masks, data, iou_prediction in zip(batched_pred_masks, batched_data, iou_predictions):
                 # Resize the ground truth mask to the original size
+                # SI DEVONO TOLGIERE TUTTI GLI UNSQUEEZE E AGGIUNGERE UNO SQUEEZE A GT MASK
                 gt_mask = F.interpolate(data["mask_inputs"], data["original_size"], mode="bilinear", align_corners=False)
                 gt_mask = (gt_mask >= 0.5).float() # binarize the mask
 
@@ -126,7 +127,7 @@ def train_sam(
                 # separated_scores_means = [torch.mean(t) for t in separated_scores]
                 # Trova l'indice del tensore con la media migliore
 
-                batch_iou_means = [torch.mean(calc_iou(mask,gt_mask)) for mask in separated_masks]
+                batch_iou_means = [torch.mean(calc_iou(mask.unsqueeze(1), gt_mask)) for mask in separated_masks]
                 best_index = torch.argmax(torch.tensor(batch_iou_means))
 
                 pred_masks = separated_masks[best_index].unsqueeze(1)
@@ -218,11 +219,8 @@ def main(cfg: Box) -> None:
                       strategy="auto",
                       loggers=[TensorBoardLogger(cfg.out_dir, name="loggers_shape_SAM")])
     fabric.launch()
-    #fabric.seed_everything(cfg.seed + fabric.global_rank)
-    #VERIFICARE CHE SENZA QUESTO DIA GLI STESSI RISULTATI
 
     fabric.seed_everything(cfg.seed)
-
 
     if fabric.global_rank == 0:
         os.makedirs(cfg.out_dir, exist_ok=True)
