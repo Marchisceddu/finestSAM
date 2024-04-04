@@ -1,44 +1,44 @@
+import os
+import matplotlib.pyplot as plt
 from torchvision.datasets import CocoDetection
 from torchvision import transforms
-from PIL import Image, ImageDraw
-import matplotlib.pyplot as plt
-import os
+from PIL import ImageDraw
 
-def display_image_with_annotations_COCO(images_path, annotation_path):
-    # Definisci la trasformazione per le immagini
+
+def display_COCO(images_path, annotation_path):
+    # Transforming images to tensors
     transform = transforms.ToTensor()
 
-    # Carica i dataset di addestramento e di test COCO
+    # Upload the dataset from the path and the annotation file
     coco_dataset = CocoDetection(root = images_path, annFile = annotation_path, transform = transform)
 
     num_images_to_display = len(os.listdir(images_path))
     for i in range(num_images_to_display):
-        # Carica l'immagine e le sue etichette dal set di addestramento
+        # Upload the image and the targets from the dataset 
         image, targets = coco_dataset[i]
 
-        # Converti l'immagine da tensore a formato immagine PIL
+        # Convert the image to PIL format
         image_pil = transforms.ToPILImage()(image)
 
-        # Prepara l'oggetto per disegnare sopra l'immagine
+        # Prepare the image for drawing
         draw = ImageDraw.Draw(image_pil)
 
-        # Aggiungi le etichette al grafico
+        # Adding the labels to the image
         for target in targets:
-            # Le annotazioni nel formato COCO contengono le coordinate dei bordi del segmento
+            # The COCO annotations are in the format of (x, y, width, height)
             segmentation = target['segmentation']
             for seg in segmentation:
-                # Converti le coordinate in una lista di tuple (x, y)
+                # Convert the segmentation to a list of points
                 points = [(seg[i], seg[i + 1]) for i in range(0, len(seg), 2)]
-                # Disegna i bordi del segmento sull'immagine
+                # Draw the bounding box
                 draw.line(points, fill='red', width=2)
 
-        # Visualizza l'immagine con le etichette
+        # Visualize the image
         plt.figure()
         plt.imshow(image_pil)
         plt.axis('off')
-
         plt.show()
 
 if __name__ == "__main__":
-    # esempio di utilizzo
-    display_image_with_annotations_COCO("./dataset/images", "./dataset/annotations.json") # AGGIUSTARE I PERCORSI
+    # Example of use
+    display_COCO("../../dataset/images/", "../../dataset/annotations.json") # the path must start from the folder where the .py file is located

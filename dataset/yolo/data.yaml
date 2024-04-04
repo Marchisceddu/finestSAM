@@ -1,6 +1,0 @@
-names:
-- shape
-nc: 1
-test: ''
-train: images
-val: images
