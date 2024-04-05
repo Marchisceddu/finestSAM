@@ -162,6 +162,7 @@ def load_datasets(cfg, img_size):
                         annotation_file=annotations_path,
                         transform=transform,
                         seed=cfg.seed)
+    
     train_dataloader = DataLoader(train,
                                   batch_size=cfg.batch_size,
                                   shuffle=True,

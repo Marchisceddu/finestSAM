@@ -1,3 +1,4 @@
+
 import os
 import cv2
 import time
@@ -21,9 +22,8 @@ from model.losses import (
     FocalLoss
 )
 
-
+torch.autograd.set_detect_anomaly(True)
 torch.set_float32_matmul_precision('high')
-
 
 def save(
     fabric: L.Fabric, 
@@ -88,7 +88,7 @@ def train_sam(
     dice_loss = DiceLoss()
     calc_iou = Calc_iou()
     
-    logits = None
+    new_logits = None
 
     for epoch in range(1, cfg.num_epochs + 1):
         batch_time = AverageMeter()
@@ -101,20 +101,23 @@ def train_sam(
 
         for iter, batched_data in enumerate(train_dataloader):
             data_time.update(time.time() - end)
-            
+
             #after the first iteration, the model will receive the low_res_logits as input
-            if logits is not None:
-                batched_data["mask_inputs"] = logits
-    
-            outputs = model(batched_input=batched_data, multimask_output=True)
+            if new_logits is not None:
+                for sample in batched_data:
+                  sample["mask_inputs"] = new_logits
+                outputs = model(batched_input=batched_data, multimask_output=True, are_logits=True)
+            else:
+                outputs = model(batched_input=batched_data, multimask_output=True)
 
             batched_pred_masks = []
             iou_predictions = []
+            raw_logits = []
             for item in outputs:
                 #take mask, iou_prediction and low_res_logits from the output
                 batched_pred_masks.append(item["masks"])
                 iou_predictions.append(item["iou_predictions"])
-                logits = item["low_res_logits"]
+                raw_logits.append(item["low_res_logits"].clone())
                 
             num_masks = sum(len(pred_mask) for pred_mask in batched_pred_masks)
 
@@ -122,7 +125,7 @@ def train_sam(
             loss_dice = torch.tensor(0., device=fabric.device)
             loss_iou = torch.tensor(0., device=fabric.device)
 
-            for pred_masks, data, iou_prediction in zip(batched_pred_masks, batched_data, iou_predictions):
+            for pred_masks, data, iou_prediction, logits in zip(batched_pred_masks, batched_data, iou_predictions, raw_logits):
                 # Resize the ground truth mask to the original size
                 # SI DEVONO TOLGIERE TUTTI GLI UNSQUEEZE E AGGIUNGERE UNO SQUEEZE A GT MASK
                 gt_mask = F.interpolate(data["mask_inputs"], data["original_size"], mode="bilinear", align_corners=False)
@@ -130,12 +133,17 @@ def train_sam(
 
                 separated_masks = torch.unbind(pred_masks, dim=1) # 3 output masks
                 separated_scores = torch.unbind(iou_prediction, dim=1) # scores for each mask
+                separated_logits = torch.unbind(logits.clone(), dim=1)
 
                 batch_iou_means = [torch.mean(calc_iou(mask.unsqueeze(1), gt_mask)) for mask in separated_masks]
                 best_index = torch.argmax(torch.tensor(batch_iou_means))
 
+                iou_prediction_means = [torch.mean(score) for score in separated_scores]
+                best_logits_index = torch.argmax(torch.tensor(iou_prediction_means))
+
                 pred_masks = separated_masks[best_index].unsqueeze(1)
                 iou_prediction = separated_scores[best_index].unsqueeze(1)
+                new_logits = separated_logits[best_logits_index].unsqueeze(1)
 
 
                 ### STAMPA (ELIMINARE)
@@ -162,7 +170,7 @@ def train_sam(
             loss_total = focal_alpha * loss_focal + loss_dice + loss_iou
             
             optimizer.zero_grad()
-            fabric.backward(loss_total)
+            fabric.backward(loss_total, retain_graph = True)
             optimizer.step()
             scheduler.step()
 
