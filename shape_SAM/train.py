@@ -105,7 +105,7 @@ def train_sam(
             #after the first iteration, the model will receive the low_res_logits as input
             if new_logits is not None:
                 for sample in batched_data:
-                  sample["mask_inputs"] = new_logits
+                  sample["mask_inputs"] = new_logits.clone().unsqueeze(1)
                 outputs = model(batched_input=batched_data, multimask_output=True, are_logits=True)
             else:
                 outputs = model(batched_input=batched_data, multimask_output=True)
@@ -127,27 +127,27 @@ def train_sam(
 
             for pred_masks, data, iou_prediction, logits in zip(batched_pred_masks, batched_data, iou_predictions, raw_logits):
                 # Resize the ground truth mask to the original size
-                # SI DEVONO TOLGIERE TUTTI GLI UNSQUEEZE E AGGIUNGERE UNO SQUEEZE A GT MASK
                 gt_mask = F.interpolate(data["mask_inputs"], data["original_size"], mode="bilinear", align_corners=False)
-                gt_mask = (gt_mask >= 0.5).float() # binarize the mask
+                gt_mask = (gt_mask.clone() >= 0.5).float() # binarize the mask
+                gt_mask = gt_mask.squeeze()
 
                 separated_masks = torch.unbind(pred_masks, dim=1) # 3 output masks
                 separated_scores = torch.unbind(iou_prediction, dim=1) # scores for each mask
                 separated_logits = torch.unbind(logits.clone(), dim=1)
 
-                batch_iou_means = [torch.mean(calc_iou(mask.unsqueeze(1), gt_mask)) for mask in separated_masks]
+                batch_iou_means = [torch.mean(calc_iou(mask, gt_mask)) for mask in separated_masks]
                 best_index = torch.argmax(torch.tensor(batch_iou_means))
 
                 iou_prediction_means = [torch.mean(score) for score in separated_scores]
                 best_logits_index = torch.argmax(torch.tensor(iou_prediction_means))
 
-                pred_masks = separated_masks[best_index].unsqueeze(1)
-                iou_prediction = separated_scores[best_index].unsqueeze(1)
-                new_logits = separated_logits[best_logits_index].unsqueeze(1)
-
+                pred_masks = separated_masks[best_index]
+                iou_prediction = separated_scores[best_index]
+                new_logits = separated_logits[best_logits_index]
+                
 
                 ### STAMPA (ELIMINARE)
-                stamp = pred_masks[2] > 0.0 # elimina il gradiente dalla maschera predetta e trasforma in bool per essere stampata
+                stamp = pred_masks[2].clone() > 0.0 # elimina il gradiente dalla maschera predetta e trasforma in bool per essere stampata
                 single_frame = data["imo"]
                 annotation_rgb = np.zeros_like(single_frame)
                 annotation_rgb[stamp.squeeze().cpu().numpy()] = [1, 255, 255] 
@@ -168,9 +168,8 @@ def train_sam(
 
             focal_alpha = 20.
             loss_total = focal_alpha * loss_focal + loss_dice + loss_iou
-            
             optimizer.zero_grad()
-            fabric.backward(loss_total, retain_graph = True)
+            fabric.backward(loss_total)
             optimizer.step()
             scheduler.step()
 
