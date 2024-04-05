@@ -87,6 +87,8 @@ def train_sam(
     focal_loss = FocalLoss()
     dice_loss = DiceLoss()
     calc_iou = Calc_iou()
+    
+    logits = None
 
     for epoch in range(1, cfg.num_epochs + 1):
         batch_time = AverageMeter()
@@ -99,14 +101,20 @@ def train_sam(
 
         for iter, batched_data in enumerate(train_dataloader):
             data_time.update(time.time() - end)
-
+            
+            #after the first iteration, the model will receive the low_res_logits as input
+            if logits is not None:
+                batched_data["mask_inputs"] = logits
+    
             outputs = model(batched_input=batched_data, multimask_output=True)
 
             batched_pred_masks = []
             iou_predictions = []
             for item in outputs:
+                #take mask, iou_prediction and low_res_logits from the output
                 batched_pred_masks.append(item["masks"])
                 iou_predictions.append(item["iou_predictions"])
+                logits = item["low_res_logits"]
                 
             num_masks = sum(len(pred_mask) for pred_mask in batched_pred_masks)
 
@@ -122,10 +130,6 @@ def train_sam(
 
                 separated_masks = torch.unbind(pred_masks, dim=1) # 3 output masks
                 separated_scores = torch.unbind(iou_prediction, dim=1) # scores for each mask
-
-                # Calcola la media di ciascun tensore nella lista
-                # separated_scores_means = [torch.mean(t) for t in separated_scores]
-                # Trova l'indice del tensore con la media migliore
 
                 batch_iou_means = [torch.mean(calc_iou(mask.unsqueeze(1), gt_mask)) for mask in separated_masks]
                 best_index = torch.argmax(torch.tensor(batch_iou_means))
