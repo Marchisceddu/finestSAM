@@ -54,6 +54,12 @@ class COCODataset(Dataset):
         for ann in anns:
             # Get the bounding box
             x, y, w, h = ann['bbox']
+            # Add random noise to each coordinate with standard deviation equal to 10% of the box sidelength, to a maximum of 20 pixels
+            x = max(0, int(x + np.random.normal(0, 0.1 * w)))
+            y = max(0, int(y + np.random.normal(0, 0.1 * h)))
+            w = min(W - x, int(w + np.random.normal(0, 0.1 * w)))
+            h = min(H - y, int(h + np.random.normal(0, 0.1 * h)))
+
             boxes.append([x, y, x + w, y + h])
 
             # Get the mask

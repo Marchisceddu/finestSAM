@@ -24,6 +24,7 @@ from model.losses import (
 
 torch.autograd.set_detect_anomaly(True)
 torch.set_float32_matmul_precision('high')
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def save(
     fabric: L.Fabric, 
@@ -90,6 +91,8 @@ def train_sam(
     
     new_logits = None
     ground_truth_masks = []
+    new_point_coords = []
+    new_point_labels = []
 
     for epoch in range(1, cfg.num_epochs + 1):
         batch_time = AverageMeter()
@@ -100,6 +103,7 @@ def train_sam(
         total_losses = AverageMeter()
         end = time.time()
 
+
         for iter, batched_data in enumerate(train_dataloader):
             data_time.update(time.time() - end)
 
@@ -108,7 +112,15 @@ def train_sam(
               for sample in batched_data:
                 new_logits = (torch.sigmoid(new_logits) > 0.5).float()
                 sample["mask_inputs"] = new_logits.clone().unsqueeze(1)
+                new_point_coords = torch.tensor(np.stack(new_point_coords, axis=0)).to(device)
+                sample["point_coords"] = new_point_coords.squeeze()
+                print(sample["point_coords"].shape)
+                test = sample["point_coords"]
+                new_point_labels = torch.as_tensor(new_point_labels, dtype=torch.int).to(device)
+                sample["point_labels"] = new_point_labels.squeeze()
               outputs = model(batched_input=batched_data, multimask_output=True, are_logits=True)
+              new_point_coords = []
+              new_point_labels = []
             else:
               for sample in batched_data:
                 ground_truth_masks.append(sample["mask_inputs"])
@@ -140,7 +152,7 @@ def train_sam(
                 separated_scores = torch.unbind(iou_prediction, dim=1) # scores for each mask
                 separated_logits = torch.unbind(logits, dim=1)
 
-                batch_iou_means = [torch.mean(calc_iou(mask, gt_mask)) for mask in separated_masks]
+                batch_iou_means = [torch.mean(calc_iou(mask, gt_mask)[0]) for mask in separated_masks]
                 best_index = torch.argmax(torch.tensor(batch_iou_means))
 
                 iou_prediction_means = [torch.mean(score) for score in separated_scores]
@@ -156,21 +168,37 @@ def train_sam(
                 single_frame = data["imo"]
                 annotation_rgb = np.zeros_like(single_frame)
                 annotation_rgb[stamp.squeeze().cpu().numpy()] = [1, 255, 255] 
-
+                
+                
+                if(epoch > 1):
+                  for i,mask in enumerate(pred_masks[2]):
+                    img = data["imo"]
+                    test = test.squeeze()
+                    for p in test[2]:
+                      p = p.cpu().numpy()
+                      x, y = p
+                      x=round(x)
+                      y=round(y)
+                      cv2.circle(img, (x, y), 2, (0, 255, 0), -1)
+                
                 # annotation = gt_mask[2].squeeze().cpu().numpy() * 255
                 # annotation_rgb = np.repeat(annotation[..., np.newaxis], 3, axis=2).astype(np.uint8)
-
+                
                 image_with_annotation = cv2.addWeighted(data["imo"], 1, annotation_rgb, 0.5, 0)
                 plt.imshow(image_with_annotation)
                 plt.axis('off')
                 plt.show()
+                
                 ### FINE STAMPA
 
-                batch_iou = calc_iou(pred_masks, gt_mask)
+                batch_iou, p, l = calc_iou(pred_masks, gt_mask)
                 loss_focal += focal_loss(pred_masks, gt_mask, num_masks)
                 loss_dice += dice_loss(pred_masks, gt_mask, num_masks)
                 loss_iou += F.mse_loss(iou_prediction, batch_iou, reduction='mean')
                 
+                new_point_coords.append(p)
+                new_point_labels.append(l)
+
             focal_alpha = 20.
             loss_total = focal_alpha * loss_focal + loss_dice + loss_iou
 
