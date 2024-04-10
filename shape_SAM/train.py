@@ -15,7 +15,10 @@ from lightning.fabric.fabric import _FabricOptimizer
 from lightning.fabric.loggers import TensorBoardLogger
 from model.model import shape_SAM
 from torch.utils.data import DataLoader
-from model.utils import AverageMeter
+from model.utils import (
+    AverageMeter,
+    calc_points_train
+)
 from model.losses import (
     Calc_iou,
     DiceLoss,
@@ -24,7 +27,6 @@ from model.losses import (
 
 torch.autograd.set_detect_anomaly(True)
 torch.set_float32_matmul_precision('high')
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def save(
     fabric: L.Fabric, 
@@ -109,15 +111,12 @@ def train_sam(
 
             #after the first iteration, the model will receive the low_res_logits as input
             if new_logits is not None:
-              for sample in batched_data:
+              for i, sample in enumerate(batched_data):
                 new_logits = (torch.sigmoid(new_logits) > 0.5).float()
                 sample["mask_inputs"] = new_logits.clone().unsqueeze(1)
-                new_point_coords = torch.tensor(np.stack(new_point_coords, axis=0)).to(device)
-                sample["point_coords"] = new_point_coords.squeeze()
-                print(sample["point_coords"].shape)
+                sample["point_coords"] = new_point_coords[i]
                 test = sample["point_coords"]
-                new_point_labels = torch.as_tensor(new_point_labels, dtype=torch.int).to(device)
-                sample["point_labels"] = new_point_labels.squeeze()
+                sample["point_labels"] = new_point_labels[i]
               outputs = model(batched_input=batched_data, multimask_output=True, are_logits=True)
               new_point_coords = []
               new_point_labels = []
@@ -152,7 +151,7 @@ def train_sam(
                 separated_scores = torch.unbind(iou_prediction, dim=1) # scores for each mask
                 separated_logits = torch.unbind(logits, dim=1)
 
-                batch_iou_means = [torch.mean(calc_iou(mask, gt_mask)[0]) for mask in separated_masks]
+                batch_iou_means = [torch.mean(calc_iou(mask, gt_mask)) for mask in separated_masks]
                 best_index = torch.argmax(torch.tensor(batch_iou_means))
 
                 iou_prediction_means = [torch.mean(score) for score in separated_scores]
@@ -161,14 +160,12 @@ def train_sam(
                 pred_masks = separated_masks[best_index]
                 iou_prediction = separated_scores[best_index]
                 new_logits = separated_logits[best_logits_index]
-              
 
                 ### STAMPA (ELIMINARE)
                 stamp = pred_masks[2].clone() > 0.0 # elimina il gradiente dalla maschera predetta e trasforma in bool per essere stampata
                 single_frame = data["imo"]
                 annotation_rgb = np.zeros_like(single_frame)
                 annotation_rgb[stamp.squeeze().cpu().numpy()] = [1, 255, 255] 
-                
                 
                 if(epoch > 1):
                   for i,mask in enumerate(pred_masks[2]):
@@ -191,7 +188,9 @@ def train_sam(
                 
                 ### FINE STAMPA
 
-                batch_iou, p, l = calc_iou(pred_masks, gt_mask)
+                p, l = calc_points_train(pred_masks, gt_mask, model.model.image_encoder.img_size, data["original_size"], fabric.device)
+
+                batch_iou = calc_iou(pred_masks, gt_mask)
                 loss_focal += focal_loss(pred_masks, gt_mask, num_masks)
                 loss_dice += dice_loss(pred_masks, gt_mask, num_masks)
                 loss_iou += F.mse_loss(iou_prediction, batch_iou, reduction='mean')
@@ -201,8 +200,6 @@ def train_sam(
 
             focal_alpha = 20.
             loss_total = focal_alpha * loss_focal + loss_dice + loss_iou
-
-            
 
             optimizer.zero_grad()
             fabric.backward(loss_total)
