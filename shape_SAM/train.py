@@ -111,12 +111,13 @@ def train_sam(
 
             #after the first iteration, the model will receive the low_res_logits as input
             if new_logits is not None:
-              for i, sample in enumerate(batched_data):
+              for sample, point_coords, point_labels in zip(batched_data, new_point_coords, new_point_labels):
                 new_logits = (torch.sigmoid(new_logits) > 0.5).float()
                 sample["mask_inputs"] = new_logits.clone().unsqueeze(1)
-                sample["point_coords"] = new_point_coords[i]
-                test = sample["point_coords"]
-                sample["point_labels"] = new_point_labels[i]
+
+                sample["point_coords"] = point_coords
+                sample["point_labels"] = point_labels
+
               outputs = model(batched_input=batched_data, multimask_output=True, are_logits=True)
               new_point_coords = []
               new_point_labels = []
@@ -167,6 +168,7 @@ def train_sam(
                 annotation_rgb = np.zeros_like(single_frame)
                 annotation_rgb[stamp.squeeze().cpu().numpy()] = [1, 255, 255] 
                 
+                '''
                 if(epoch > 1):
                   for i,mask in enumerate(pred_masks[2]):
                     img = data["imo"]
@@ -177,6 +179,7 @@ def train_sam(
                       x=round(x)
                       y=round(y)
                       cv2.circle(img, (x, y), 2, (0, 255, 0), -1)
+                '''
                 
                 # annotation = gt_mask[2].squeeze().cpu().numpy() * 255
                 # annotation_rgb = np.repeat(annotation[..., np.newaxis], 3, axis=2).astype(np.uint8)
@@ -189,14 +192,13 @@ def train_sam(
                 ### FINE STAMPA
 
                 p, l = calc_points_train(pred_masks, gt_mask, model.model.image_encoder.img_size, data["original_size"], fabric.device)
+                new_point_coords.append(p)
+                new_point_labels.append(l)
 
                 batch_iou = calc_iou(pred_masks, gt_mask)
                 loss_focal += focal_loss(pred_masks, gt_mask, num_masks)
                 loss_dice += dice_loss(pred_masks, gt_mask, num_masks)
                 loss_iou += F.mse_loss(iou_prediction, batch_iou, reduction='mean')
-                
-                new_point_coords.append(p)
-                new_point_labels.append(l)
 
             focal_alpha = 20.
             loss_total = focal_alpha * loss_focal + loss_dice + loss_iou

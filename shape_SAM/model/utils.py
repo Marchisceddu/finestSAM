@@ -43,7 +43,7 @@ def show_anns(anns, opacity=0.35):
 def calc_points_train(pred_mask: torch.Tensor, gt_mask: torch.Tensor, img_size: int, original_size: tuple, device: torch.device):
     transform = ResizeLongestSide(img_size)
 
-    pred_mask = (pred_mask >= 0.5).float()
+    pred_mask = (pred_mask >= 0.1).float()
     pred_mask = pred_mask.squeeze()
     gt_mask = gt_mask.squeeze()
     
