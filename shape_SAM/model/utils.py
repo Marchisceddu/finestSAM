@@ -100,7 +100,7 @@ def calc_points_train(pred_mask: torch.Tensor, gt_mask: torch.Tensor, img_size: 
         point_labels.append(actual_point_labels)
 
     # Normalizzo i punti
-    point_coords = transform.apply_coords(point_coords, original_size)
+    point_coords = transform.apply_coords(np.array(point_coords), original_size)
     point_coords = torch.tensor(np.stack(point_coords, axis=0)).to(device)
 
     point_labels = torch.as_tensor(point_labels, dtype=torch.int).to(device)
