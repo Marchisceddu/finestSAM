@@ -54,6 +54,12 @@ class COCODataset(Dataset):
         for ann in anns:
             # Get the bounding box
             x, y, w, h = ann['bbox']
+            # Add random noise to each coordinate with standard deviation equal to 10% of the box sidelength, to a maximum of 20 pixels
+            x = max(0, int(x + np.random.normal(0, 0.1 * w)))
+            y = max(0, int(y + np.random.normal(0, 0.1 * h)))
+            w = min(W - x, int(w + np.random.normal(0, 0.1 * w)))
+            h = min(H - y, int(h + np.random.normal(0, 0.1 * h)))
+
             boxes.append([x, y, x + w, y + h])
 
             # Get the mask
@@ -72,7 +78,7 @@ class COCODataset(Dataset):
                             list_point_0.append([i, j])
 
             temp_list_point = []
-            for i in range(0, cfg.dataset.positive_points):
+            for i in range(0, cfg.dataset.positve_points):
                 idx = np.random.randint(0, len(list_point_1))
                 temp_list_point.append(list_point_1[idx])
             list_point_1 = temp_list_point.copy()
@@ -162,6 +168,7 @@ def load_datasets(cfg, img_size):
                         annotation_file=annotations_path,
                         transform=transform,
                         seed=cfg.seed)
+    
     train_dataloader = DataLoader(train,
                                   batch_size=cfg.batch_size,
                                   shuffle=True,

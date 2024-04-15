@@ -28,8 +28,8 @@ config = {
     "dataset": {
         "root_dir": "../../dataset/images",
         "annotation_file": "../../dataset/annotations.json",
-        "positive_points": 9,
-        "negative_points": 9,
+        "positive_points": 8,
+        "negative_points": 0,
         
         "train": {
             "root_dir": "../../dataset/train",
@@ -44,5 +44,6 @@ config = {
 
 #ATTENZIONE
 # train e val in dataset vanno eliminati in teoria e sostituiti con lo split del dataset in dataset.py
+# Ho messo 1 e zero perchè nel paper c'è scritto che usa solo un punto ma non ho capito nulla
 
 cfg = Box(config)

@@ -1,3 +1,4 @@
+
 import os
 import cv2
 import time
@@ -14,16 +15,18 @@ from lightning.fabric.fabric import _FabricOptimizer
 from lightning.fabric.loggers import TensorBoardLogger
 from model.model import shape_SAM
 from torch.utils.data import DataLoader
-from model.utils import AverageMeter
+from model.utils import (
+    AverageMeter,
+    calc_points_train
+)
 from model.losses import (
     Calc_iou,
     DiceLoss,
     FocalLoss
 )
 
-
+torch.autograd.set_detect_anomaly(True)
 torch.set_float32_matmul_precision('high')
-
 
 def save(
     fabric: L.Fabric, 
@@ -87,6 +90,11 @@ def train_sam(
     focal_loss = FocalLoss()
     dice_loss = DiceLoss()
     calc_iou = Calc_iou()
+    
+    new_logits = None
+    ground_truth_masks = []
+    new_point_coords = []
+    new_point_labels = []
 
     for epoch in range(1, cfg.num_epochs + 1):
         batch_time = AverageMeter()
@@ -97,16 +105,36 @@ def train_sam(
         total_losses = AverageMeter()
         end = time.time()
 
+
         for iter, batched_data in enumerate(train_dataloader):
             data_time.update(time.time() - end)
 
-            outputs = model(batched_input=batched_data, multimask_output=True)
+            #after the first iteration, the model will receive the low_res_logits as input
+            if new_logits is not None:
+              for sample, point_coords, point_labels in zip(batched_data, new_point_coords, new_point_labels):
+                new_logits = (torch.sigmoid(new_logits) > 0.5).float()
+                sample["mask_inputs"] = new_logits.clone().unsqueeze(1)
+
+                sample["point_coords"] = point_coords
+                sample["point_labels"] = point_labels
+
+              outputs = model(batched_input=batched_data, multimask_output=True, are_logits=True)
+              new_point_coords = []
+              new_point_labels = []
+            else:
+              for sample in batched_data:
+                ground_truth_masks.append(sample["mask_inputs"])
+
+              outputs = model(batched_input=batched_data, multimask_output=True)
 
             batched_pred_masks = []
             iou_predictions = []
+            raw_logits = []
             for item in outputs:
+                #take mask, iou_prediction and low_res_logits from the output
                 batched_pred_masks.append(item["masks"])
                 iou_predictions.append(item["iou_predictions"])
+                raw_logits.append(item["low_res_logits"])
                 
             num_masks = sum(len(pred_mask) for pred_mask in batched_pred_masks)
 
@@ -114,40 +142,55 @@ def train_sam(
             loss_dice = torch.tensor(0., device=fabric.device)
             loss_iou = torch.tensor(0., device=fabric.device)
 
-            for pred_masks, data, iou_prediction in zip(batched_pred_masks, batched_data, iou_predictions):
+            for pred_masks, data, iou_prediction, logits, ground_truth_mask in zip(batched_pred_masks, batched_data, iou_predictions, raw_logits, ground_truth_masks):
                 # Resize the ground truth mask to the original size
-                # SI DEVONO TOLGIERE TUTTI GLI UNSQUEEZE E AGGIUNGERE UNO SQUEEZE A GT MASK
-                gt_mask = F.interpolate(data["mask_inputs"], data["original_size"], mode="bilinear", align_corners=False)
-                gt_mask = (gt_mask >= 0.5).float() # binarize the mask
+                gt_mask = F.interpolate(ground_truth_mask, data["original_size"], mode="bilinear", align_corners=False)
+                gt_mask = (gt_mask.clone() >= 0.5).float() # binarize the mask
+                gt_mask = gt_mask.squeeze()
 
                 separated_masks = torch.unbind(pred_masks, dim=1) # 3 output masks
                 separated_scores = torch.unbind(iou_prediction, dim=1) # scores for each mask
+                separated_logits = torch.unbind(logits, dim=1)
 
-                # Calcola la media di ciascun tensore nella lista
-                # separated_scores_means = [torch.mean(t) for t in separated_scores]
-                # Trova l'indice del tensore con la media migliore
+                iou_prediction_means = [torch.mean(score) for score in separated_scores]
+                best_index = torch.argmax(torch.tensor(iou_prediction_means))
 
-                batch_iou_means = [torch.mean(calc_iou(mask.unsqueeze(1), gt_mask)) for mask in separated_masks]
-                best_index = torch.argmax(torch.tensor(batch_iou_means))
-
-                pred_masks = separated_masks[best_index].unsqueeze(1)
-                iou_prediction = separated_scores[best_index].unsqueeze(1)
-
+                pred_masks = separated_masks[best_index]
+                iou_prediction = separated_scores[best_index]
+                new_logits = separated_logits[best_index]
 
                 ### STAMPA (ELIMINARE)
-                stamp = pred_masks[2] > 0.0 # elimina il gradiente dalla maschera predetta e trasforma in bool per essere stampata
+                stamp = pred_masks[2].clone() > 0.0 # elimina il gradiente dalla maschera predetta e trasforma in bool per essere stampata
                 single_frame = data["imo"]
                 annotation_rgb = np.zeros_like(single_frame)
                 annotation_rgb[stamp.squeeze().cpu().numpy()] = [1, 255, 255] 
-
+                
+                '''
+                if(epoch > 1):
+                  for i,mask in enumerate(pred_masks[2]):
+                    img = data["imo"]
+                    test = test.squeeze()
+                    for p in test[2]:
+                      p = p.cpu().numpy()
+                      x, y = p
+                      x=round(x)
+                      y=round(y)
+                      cv2.circle(img, (x, y), 2, (0, 255, 0), -1)
+                '''
+                
                 # annotation = gt_mask[2].squeeze().cpu().numpy() * 255
                 # annotation_rgb = np.repeat(annotation[..., np.newaxis], 3, axis=2).astype(np.uint8)
-
+                
                 image_with_annotation = cv2.addWeighted(data["imo"], 1, annotation_rgb, 0.5, 0)
                 plt.imshow(image_with_annotation)
                 plt.axis('off')
                 plt.show()
+                
                 ### FINE STAMPA
+
+                p, l = calc_points_train(pred_masks, gt_mask, model.model.image_encoder.img_size, data["original_size"], fabric.device)
+                new_point_coords.append(p)
+                new_point_labels.append(l)
 
                 batch_iou = calc_iou(pred_masks, gt_mask)
                 loss_focal += focal_loss(pred_masks, gt_mask, num_masks)
@@ -156,7 +199,7 @@ def train_sam(
 
             focal_alpha = 20.
             loss_total = focal_alpha * loss_focal + loss_dice + loss_iou
-            
+
             optimizer.zero_grad()
             fabric.backward(loss_total)
             optimizer.step()

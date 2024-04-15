@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import numpy as np
+from .config import cfg
 
 ALPHA = 0.7
 GAMMA = 2
