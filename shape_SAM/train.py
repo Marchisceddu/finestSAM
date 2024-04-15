@@ -152,15 +152,12 @@ def train_sam(
                 separated_scores = torch.unbind(iou_prediction, dim=1) # scores for each mask
                 separated_logits = torch.unbind(logits, dim=1)
 
-                batch_iou_means = [torch.mean(calc_iou(mask, gt_mask)) for mask in separated_masks]
-                best_index = torch.argmax(torch.tensor(batch_iou_means))
-
                 iou_prediction_means = [torch.mean(score) for score in separated_scores]
-                best_logits_index = torch.argmax(torch.tensor(iou_prediction_means))
+                best_index = torch.argmax(torch.tensor(iou_prediction_means))
 
                 pred_masks = separated_masks[best_index]
                 iou_prediction = separated_scores[best_index]
-                new_logits = separated_logits[best_logits_index]
+                new_logits = separated_logits[best_index]
 
                 ### STAMPA (ELIMINARE)
                 stamp = pred_masks[2].clone() > 0.0 # elimina il gradiente dalla maschera predetta e trasforma in bool per essere stampata

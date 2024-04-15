@@ -83,8 +83,7 @@ class shape_SAM(nn.Module):
         if are_logits:
           input_masks = [x["mask_inputs"] for x in batched_input]
         else:
-          input_masks = [self.preprocess_masks(x["mask_inputs"]) for x in batched_input]
-            
+          input_masks = [self.preprocess_masks(x["mask_inputs"]) for x in batched_input]            
 
         outputs = []
         for image_record, curr_embedding, masks in zip(batched_input, image_embeddings, input_masks):

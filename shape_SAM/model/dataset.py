@@ -78,7 +78,7 @@ class COCODataset(Dataset):
                             list_point_0.append([i, j])
 
             temp_list_point = []
-            for i in range(0, cfg.dataset.positive_points):
+            for i in range(0, cfg.dataset.positve_points):
                 idx = np.random.randint(0, len(list_point_1))
                 temp_list_point.append(list_point_1[idx])
             list_point_1 = temp_list_point.copy()
