@@ -1,7 +1,8 @@
 from box import Box
 
 config = {
-    "seed": 1337,
+    "seed_device": 1337,
+    "seed_dataloader": None,
     "num_devices": "auto",
     "batch_size": 1,
     "num_workers": 2,
@@ -16,6 +17,9 @@ config = {
         "steps": [60000, 86666],
         "warmup_steps": 250,
     },
+    "use_boxes": False,
+    "use_points": True,
+    "use_masks": True,
     "model": {
         "type": 'vit_h',
         "checkpoint": "sam_vit_h_4b8939.pth",
@@ -28,7 +32,7 @@ config = {
     "dataset": {
         "root_dir": "../../dataset/images",
         "annotation_file": "../../dataset/annotations.json",
-        "positive_points": 8,
+        "positive_points": 1,
         "negative_points": 0,
         
         "train": {

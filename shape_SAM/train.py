@@ -91,11 +91,6 @@ def train_sam(
     dice_loss = DiceLoss()
     calc_iou = Calc_iou()
     
-    new_logits = None
-    ground_truth_masks = []
-    new_point_coords = []
-    new_point_labels = []
-
     for epoch in range(1, cfg.num_epochs + 1):
         batch_time = AverageMeter()
         data_time = AverageMeter()
@@ -109,32 +104,15 @@ def train_sam(
         for iter, batched_data in enumerate(train_dataloader):
             data_time.update(time.time() - end)
 
-            #after the first iteration, the model will receive the low_res_logits as input
-            if new_logits is not None:
-              for sample, point_coords, point_labels in zip(batched_data, new_point_coords, new_point_labels):
-                new_logits = (torch.sigmoid(new_logits) > 0.5).float()
-                sample["mask_inputs"] = new_logits.clone().unsqueeze(1)
-
-                sample["point_coords"] = point_coords
-                sample["point_labels"] = point_labels
-
-              outputs = model(batched_input=batched_data, multimask_output=True, are_logits=True)
-              new_point_coords = []
-              new_point_labels = []
-            else:
-              for sample in batched_data:
-                ground_truth_masks.append(sample["mask_inputs"])
-
-              outputs = model(batched_input=batched_data, multimask_output=True)
+            outputs = model(batched_input=batched_data, multimask_output=True)
 
             batched_pred_masks = []
             iou_predictions = []
-            raw_logits = []
+            logits = []
             for item in outputs:
                 #take mask, iou_prediction and low_res_logits from the output
                 batched_pred_masks.append(item["masks"])
                 iou_predictions.append(item["iou_predictions"])
-                raw_logits.append(item["low_res_logits"])
                 
             num_masks = sum(len(pred_mask) for pred_mask in batched_pred_masks)
 
@@ -142,22 +120,16 @@ def train_sam(
             loss_dice = torch.tensor(0., device=fabric.device)
             loss_iou = torch.tensor(0., device=fabric.device)
 
-            for pred_masks, data, iou_prediction, logits, ground_truth_mask in zip(batched_pred_masks, batched_data, iou_predictions, raw_logits, ground_truth_masks):
-                # Resize the ground truth mask to the original size
-                gt_mask = F.interpolate(ground_truth_mask, data["original_size"], mode="bilinear", align_corners=False)
-                gt_mask = (gt_mask.clone() >= 0.5).float() # binarize the mask
-                gt_mask = gt_mask.squeeze()
-
+            for pred_masks, data, iou_prediction, logits in zip(batched_pred_masks, batched_data, iou_predictions, logits):
+    
                 separated_masks = torch.unbind(pred_masks, dim=1) # 3 output masks
                 separated_scores = torch.unbind(iou_prediction, dim=1) # scores for each mask
-                separated_logits = torch.unbind(logits, dim=1)
 
                 iou_prediction_means = [torch.mean(score) for score in separated_scores]
                 best_index = torch.argmax(torch.tensor(iou_prediction_means))
 
                 pred_masks = separated_masks[best_index]
                 iou_prediction = separated_scores[best_index]
-                new_logits = separated_logits[best_index]
 
                 ### STAMPA (ELIMINARE)
                 stamp = pred_masks[2].clone() > 0.0 # elimina il gradiente dalla maschera predetta e trasforma in bool per essere stampata
@@ -188,13 +160,9 @@ def train_sam(
                 
                 ### FINE STAMPA
 
-                p, l = calc_points_train(pred_masks, gt_mask, model.model.image_encoder.img_size, data["original_size"], fabric.device)
-                new_point_coords.append(p)
-                new_point_labels.append(l)
-
-                batch_iou = calc_iou(pred_masks, gt_mask)
-                loss_focal += focal_loss(pred_masks, gt_mask, num_masks)
-                loss_dice += dice_loss(pred_masks, gt_mask, num_masks)
+                batch_iou = calc_iou(pred_masks, data["gt_masks"])
+                loss_focal += focal_loss(pred_masks, data["gt_masks"], num_masks)
+                loss_dice += dice_loss(pred_masks, data["gt_masks"], num_masks)
                 loss_iou += F.mse_loss(iou_prediction, batch_iou, reduction='mean')
 
             focal_alpha = 20.

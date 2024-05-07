@@ -14,7 +14,7 @@ from .config import cfg
 
 class COCODataset(Dataset):
 
-    def __init__(self, root_dir, annotation_file, transform=None, seed=42):
+    def __init__(self, root_dir, annotation_file, transform=None, seed=None):
         self.seed = seed
         self.root_dir = root_dir
         self.transform = transform
@@ -96,32 +96,42 @@ class COCODataset(Dataset):
             point_labels.append(list_label_1 + list_label_0)
     
         if self.transform:
-            image, masks, boxes, point_coords = self.transform(image, masks, np.array(boxes), np.array(point_coords))
+            image, resized_masks, boxes, point_coords = self.transform(image, masks, np.array(boxes), np.array(point_coords))
 
         # Convert the data to tensor
         boxes = torch.tensor(np.stack(boxes, axis=0))
         masks = torch.tensor(np.stack(masks, axis=0)).float()
+        resized_masks = torch.tensor(np.stack(resized_masks, axis=0)).float()
         point_coords = torch.tensor(np.stack(point_coords, axis=0))
         point_labels = torch.as_tensor(point_labels, dtype=torch.int)
 
-        masks = masks.unsqueeze(1)
+        resized_masks = resized_masks.unsqueeze(1)
         
-        return image, original_size, point_coords, point_labels, boxes, masks, imo
-
+        return image, original_size, point_coords, point_labels, boxes, masks, resized_masks, imo
+    
 
 def collate_fn(batch):
     batched_data = []
 
     for data in batch:
-        image, original_size, point_coord, point_label, box, mask, imo = data
+        image, original_size, point_coord, point_label, boxes, masks, resized_masks, imo = data
+
+        if not cfg.use_boxes:
+            boxes = None
+        if not cfg.use_points:
+            point_coord = None
+            point_label = None
+        if not cfg.use_masks:
+            resized_masks = None
 
         batched_data.append({
             "image": image,
             "original_size": original_size,
             "point_coords": point_coord,
             "point_labels": point_label,
-            "boxes": box,
-            "mask_inputs": mask,
+            "boxes": boxes,
+            "mask_inputs": resized_masks,
+            "gt_masks": masks,
             "imo": imo
         })
 
@@ -146,6 +156,7 @@ class ResizeAndPad:
         resized_masks = []
         for mask in masks:
             mask = F.max_pool2d(mask.unsqueeze(0).unsqueeze(0), kernel_size=4, stride=4).squeeze()
+            mask = self.preprocess_masks(mask)
             resized_masks.append(mask)
 
         # Adjust bounding boxes and point coordinates
@@ -153,6 +164,15 @@ class ResizeAndPad:
         point_coords = self.transform.apply_coords(point_coords, (og_h, og_w))
 
         return image, resized_masks, boxes, point_coords
+    
+    def preprocess_masks(self, x: torch.Tensor) -> torch.Tensor:
+        """Normalize pixel values and pad to a square input."""
+        # Pad
+        h, w = x.shape[-2:]
+        padh = self.model.image_encoder.img_size//4 - h
+        padw = self.model.image_encoder.img_size//4 - w
+        x = F.pad(x, (0, padw, 0, padh))
+        return x
 
 
 def load_datasets(cfg, img_size):
