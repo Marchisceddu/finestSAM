@@ -8,7 +8,7 @@ config = {
     "num_workers": 2,
     "num_epochs": 200,
     "k_fold": 5,
-    "eval_interval": 200,
+    "eval_interval": 100,
     "out_dir": "sav",
     "opt": {
         "learning_rate": 8e-4,
@@ -17,8 +17,8 @@ config = {
         "steps": [60000, 86666],
         "warmup_steps": 250,
     },
-    "use_boxes": False,
-    "use_points": True,
+    "use_boxes": True,
+    "use_points": False,
     "use_masks": True,
     "model": {
         "type": 'vit_h',

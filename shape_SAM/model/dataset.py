@@ -78,7 +78,7 @@ class COCODataset(Dataset):
                             list_point_0.append([i, j])
 
             temp_list_point = []
-            for i in range(0, cfg.dataset.positve_points):
+            for i in range(0, cfg.dataset.positive_points):
                 idx = np.random.randint(0, len(list_point_1))
                 temp_list_point.append(list_point_1[idx])
             list_point_1 = temp_list_point.copy()
@@ -169,8 +169,8 @@ class ResizeAndPad:
         """Normalize pixel values and pad to a square input."""
         # Pad
         h, w = x.shape[-2:]
-        padh = self.model.image_encoder.img_size//4 - h
-        padw = self.model.image_encoder.img_size//4 - w
+        padh = 1024//4 - h
+        padw = 1024//4 - w
         x = F.pad(x, (0, padw, 0, padh))
         return x
 
@@ -187,7 +187,7 @@ def load_datasets(cfg, img_size):
     train = COCODataset(root_dir=dataset_path,
                         annotation_file=annotations_path,
                         transform=transform,
-                        seed=cfg.seed)
+                        seed=cfg.seed_dataloader)
     
     train_dataloader = DataLoader(train,
                                   batch_size=cfg.batch_size,

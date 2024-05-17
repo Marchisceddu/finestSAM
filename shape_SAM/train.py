@@ -16,8 +16,7 @@ from lightning.fabric.loggers import TensorBoardLogger
 from model.model import shape_SAM
 from torch.utils.data import DataLoader
 from model.utils import (
-    AverageMeter,
-    calc_points_train
+    AverageMeter
 )
 from model.losses import (
     Calc_iou,
@@ -120,7 +119,7 @@ def train_sam(
             loss_dice = torch.tensor(0., device=fabric.device)
             loss_iou = torch.tensor(0., device=fabric.device)
 
-            for pred_masks, data, iou_prediction, logits in zip(batched_pred_masks, batched_data, iou_predictions, logits):
+            for pred_masks, data, iou_prediction in zip(batched_pred_masks, batched_data, iou_predictions):
     
                 separated_masks = torch.unbind(pred_masks, dim=1) # 3 output masks
                 separated_scores = torch.unbind(iou_prediction, dim=1) # scores for each mask
@@ -231,7 +230,7 @@ def main(cfg: Box) -> None:
                       loggers=[TensorBoardLogger(cfg.out_dir, name="loggers_shape_SAM")])
     fabric.launch()
 
-    fabric.seed_everything(cfg.seed)
+    fabric.seed_everything(cfg.seed_device)
 
     if fabric.global_rank == 0:
         os.makedirs(cfg.out_dir, exist_ok=True)

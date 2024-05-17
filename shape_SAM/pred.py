@@ -9,6 +9,27 @@ from model.model import shape_SAM
 from model.config import cfg
 from model.dataset import COCODataset
 
+# SISTEMARE IN UTILS
+def show_mask(mask, ax, random_color=False):
+    if random_color:
+        color = np.concatenate([np.random.random(3), np.array([0.6])], axis=0)
+    else:
+        color = np.array([30/255, 144/255, 255/255, 0.6])
+    h, w = mask.shape[-2:]
+    mask_image = mask.cpu().numpy().reshape(h, w, 1) * color.reshape(1, 1, -1)
+    ax.imshow(mask_image)
+    
+def show_points(coords, labels, ax, marker_size=375):
+    pos_points = coords[labels==1].cpu().numpy()
+    neg_points = coords[labels==0].cpu().numpy()
+    ax.scatter(pos_points[:, 0], pos_points[:, 1], color='green', marker='*', s=marker_size, edgecolor='white', linewidth=1.25)
+    ax.scatter(neg_points[:, 0], neg_points[:, 1], color='red', marker='*', s=marker_size, edgecolor='white', linewidth=1.25)   
+    
+def show_box(box, ax):
+    x0, y0 = box[0], box[1]
+    w, h = box[2] - box[0], box[3] - box[1]
+    ax.add_patch(plt.Rectangle((x0, y0), w, h, edgecolor='green', facecolor=(0,0,0,0), lw=2))   
+
 
 def pred_auto(path):
     # Get the image
@@ -22,7 +43,7 @@ def pred_auto(path):
                     devices=cfg.num_devices,
                     strategy="auto")
     fabric.launch()
-    fabric.seed_everything(cfg.seed + fabric.global_rank)
+    fabric.seed_everything(cfg.seed_device)
 
     with fabric.device:
         model = shape_SAM(cfg)
@@ -51,7 +72,7 @@ def pred_boxes():
                     devices=cfg.num_devices,
                     strategy="auto")
     fabric.launch()
-    fabric.seed_everything(cfg.seed + fabric.global_rank)
+    fabric.seed_everything(cfg.seed_device)
 
     with fabric.device:
         model = shape_SAM(cfg)
@@ -93,11 +114,14 @@ def pred_boxes():
         ) 
 
         # Show the image with the masks
-        plt.figure(figsize=(8,8))
-        plt.imshow(image)
-        show_anns(masks, opacity=1)
-        plt.axis('off')
-        plt.show()
+        for i, mask in enumerate(masks):
+            plt.figure(figsize=(10,10))
+            plt.imshow(image)
+            show_mask(mask, plt.gca())
+            #show_points(point_coords, point_labels, plt.gca())
+            #plt.title(f"Mask {i+1}, Score: {score:.3f}", fontsize=18)
+            plt.axis('off')
+            plt.show() 
 
         #  Save the masks
 
@@ -110,7 +134,7 @@ def pred_points():
                     devices=cfg.num_devices,
                     strategy="auto")
     fabric.launch()
-    fabric.seed_everything(cfg.seed + fabric.global_rank)
+    fabric.seed_everything(cfg.seed_device)
 
     with fabric.device:
         model = shape_SAM(cfg)
@@ -154,7 +178,7 @@ def pred_points():
                             list_point_0.append([i, j])
 
             temp_list_point = []
-            for i in range(0, cfg.dataset.positve_points):
+            for i in range(0, cfg.dataset.positive_points):
                 idx = np.random.randint(0, len(list_point_1))
                 temp_list_point.append(list_point_1[idx])
             list_point_1 = temp_list_point.copy()
@@ -177,7 +201,7 @@ def pred_points():
         
 
         predictor.set_image(image)
-        masks, _, _ = predictor.predict_torch(
+        masks, scores, _ = predictor.predict_torch(
             point_coords=point_coords,
             point_labels=point_labels,
             boxes=None,
@@ -185,15 +209,18 @@ def pred_points():
         ) 
 
         # Show the image with the masks
-        plt.figure(figsize=(8,8))
-        plt.imshow(image)
-        show_anns(masks, opacity=1)
-        plt.axis('off')
-        plt.show()
+        for i, (mask, score) in enumerate(zip(masks, scores)):
+            plt.figure(figsize=(10,10))
+            plt.imshow(image)
+            show_mask(mask, plt.gca())
+            #show_points(point_coords, point_labels, plt.gca())
+            #plt.title(f"Mask {i+1}, Score: {score:.3f}", fontsize=18)
+            plt.axis('off')
+            plt.show()  
 
         #  Save the masks
 
 
 if __name__ == '__main__':
     #pred_auto('../dataset/images/0.png')
-    pred_boxes()
+    pred_points()
