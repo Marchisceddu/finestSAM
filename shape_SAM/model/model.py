@@ -79,12 +79,6 @@ class shape_SAM(nn.Module):
         input_images = torch.stack([self.model.preprocess(x["image"]) for x in batched_input], dim=0)
         image_embeddings = self.model.image_encoder(input_images)
 
-        print(input_images[0].shape)
-        plt.figure(figsize=(10,10))
-        plt.imshow(input_images[0])
-        plt.axis('off')
-        plt.show() 
-
         outputs = []
         for image_record, curr_embedding in zip(batched_input, image_embeddings):
             if "point_coords" in image_record and image_record["point_coords"] is not None:

@@ -242,15 +242,12 @@ def main(cfg: Box) -> None:
 
     train_data, val_data = load_datasets(cfg, model.model.image_encoder.img_size)
     train_data = fabric._setup_dataloader(train_data)
-    #val_data = fabric._setup_dataloader(val_data)
+    val_data = fabric._setup_dataloader(val_data)
 
-    #optimizer, scheduler = configure_opt(cfg, model)
-    #model, optimizer = fabric.setup(model, optimizer)
+    optimizer, scheduler = configure_opt(cfg, model)
+    model, optimizer = fabric.setup(model, optimizer)
 
-    for iter, batched_data in enumerate(train_data):
-        continue
-
-    #train_sam(cfg, fabric, model, optimizer, scheduler, train_data, val_data)
+    train_sam(cfg, fabric, model, optimizer, scheduler, train_data, val_data)
     #validate(fabric, model, train_data, epoch=0)
 
 
