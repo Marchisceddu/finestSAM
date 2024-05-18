@@ -8,6 +8,7 @@ from typing import Any, Dict, List
 from .segment_anything import sam_model_registry
 from .segment_anything import SamPredictor, SamAutomaticMaskGenerator
 
+import matplotlib.pyplot as plt
 
 class shape_SAM(nn.Module):
 
@@ -78,6 +79,12 @@ class shape_SAM(nn.Module):
         input_images = torch.stack([self.model.preprocess(x["image"]) for x in batched_input], dim=0)
         image_embeddings = self.model.image_encoder(input_images)
 
+        print(input_images[0].shape)
+        plt.figure(figsize=(10,10))
+        plt.imshow(input_images[0])
+        plt.axis('off')
+        plt.show() 
+
         outputs = []
         for image_record, curr_embedding in zip(batched_input, image_embeddings):
             if "point_coords" in image_record and image_record["point_coords"] is not None:
@@ -116,7 +123,7 @@ class shape_SAM(nn.Module):
         return outputs
     
     def get_predictor(self):
-        return SamPredictor(model = self.model)
+        return SamPredictor(self.model)
 
     def get_automatic_predictor(self, min_mask_region_area = 0):
         return SamAutomaticMaskGenerator(model = self.model, min_mask_region_area = min_mask_region_area)

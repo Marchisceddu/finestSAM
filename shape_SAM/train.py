@@ -224,7 +224,7 @@ def main(cfg: Box) -> None:
     current_directory = os.path.dirname(os.path.abspath(__file__))
     cfg.out_dir = os.path.join(current_directory, cfg.out_dir)
 
-    fabric = L.Fabric(accelerator="auto",
+    fabric = L.Fabric(accelerator="cpu",
                       devices=cfg.num_devices,
                       strategy="auto",
                       loggers=[TensorBoardLogger(cfg.out_dir, name="loggers_shape_SAM")])
@@ -242,12 +242,15 @@ def main(cfg: Box) -> None:
 
     train_data, val_data = load_datasets(cfg, model.model.image_encoder.img_size)
     train_data = fabric._setup_dataloader(train_data)
-    val_data = fabric._setup_dataloader(val_data)
+    #val_data = fabric._setup_dataloader(val_data)
 
-    optimizer, scheduler = configure_opt(cfg, model)
-    model, optimizer = fabric.setup(model, optimizer)
+    #optimizer, scheduler = configure_opt(cfg, model)
+    #model, optimizer = fabric.setup(model, optimizer)
 
-    train_sam(cfg, fabric, model, optimizer, scheduler, train_data, val_data)
+    for iter, batched_data in enumerate(train_data):
+        continue
+
+    #train_sam(cfg, fabric, model, optimizer, scheduler, train_data, val_data)
     #validate(fabric, model, train_data, epoch=0)
 
 

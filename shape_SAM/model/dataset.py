@@ -11,6 +11,7 @@ from torch.utils.data import DataLoader
 from torch.utils.data import Dataset
 from .config import cfg
 
+import matplotlib.pyplot as plt
 
 class COCODataset(Dataset):
 
@@ -149,13 +150,14 @@ class ResizeAndPad:
         # Resize image and masks
         og_h, og_w, _ = image.shape
         image = self.transform.apply_image(image)
-        masks = [torch.tensor(self.transform.apply_image(mask)) for mask in masks]
+        masks = [torch.tensor(self.transform.apply_image(mask)) for mask in masks]        
         image = self.to_tensor(image)
 
         # Resize masks to 1/4th resolution of the image 
         resized_masks = []
         for mask in masks:
-            mask = F.max_pool2d(mask.unsqueeze(0).unsqueeze(0), kernel_size=4, stride=4).squeeze()
+            # CAPITRE SE METTENDO FLOAT POI SI DEVE RICONVERTIRE IN BYTE?
+            mask = F.max_pool2d(mask.unsqueeze(0).unsqueeze(0).float(), kernel_size=4, stride=4).squeeze()
             mask = self.preprocess_masks(mask)
             resized_masks.append(mask)
 
