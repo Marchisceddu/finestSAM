@@ -1,7 +1,6 @@
 import os
 import cv2
 import torch
-import random
 import numpy as np
 import torchvision.transforms as transforms
 import torch.nn.functional as F
@@ -10,8 +9,6 @@ from .segment_anything.utils.transforms import ResizeLongestSide
 from torch.utils.data import DataLoader
 from torch.utils.data import Dataset
 from .config import cfg
-
-import matplotlib.pyplot as plt
 
 class COCODataset(Dataset):
 
@@ -133,7 +130,6 @@ def collate_fn(batch):
             "boxes": boxes,
             "mask_inputs": resized_masks,
             "gt_masks": masks,
-            "imo": imo
         })
 
     return batched_data
@@ -158,7 +154,6 @@ class ResizeAndPad:
         for mask in masks:
             # CAPITRE SE METTENDO FLOAT POI SI DEVE RICONVERTIRE IN BYTE?
             mask = F.max_pool2d(mask.unsqueeze(0).unsqueeze(0).float(), kernel_size=4, stride=4).squeeze()
-            mask = self.preprocess_masks(mask)
             resized_masks.append(mask)
 
         # Adjust bounding boxes and point coordinates
@@ -166,15 +161,6 @@ class ResizeAndPad:
         point_coords = self.transform.apply_coords(point_coords, (og_h, og_w))
 
         return image, resized_masks, boxes, point_coords
-    
-    def preprocess_masks(self, x: torch.Tensor) -> torch.Tensor:
-        """Normalize pixel values and pad to a square input."""
-        # Pad
-        h, w = x.shape[-2:]
-        padh = 1024//4 - h
-        padw = 1024//4 - w
-        x = F.pad(x, (0, padw, 0, padh))
-        return x
 
 
 def load_datasets(cfg, img_size):

@@ -18,7 +18,7 @@ config = {
         "warmup_steps": 250,
     },
     "use_boxes": True,
-    "use_points": False,
+    "use_points": True,
     "use_masks": True,
     "model": {
         "type": 'vit_h',
@@ -48,6 +48,5 @@ config = {
 
 #ATTENZIONE
 # train e val in dataset vanno eliminati in teoria e sostituiti con lo split del dataset in dataset.py
-# Ho messo 1 e zero perchè nel paper c'è scritto che usa solo un punto ma non ho capito nulla
 
 cfg = Box(config)

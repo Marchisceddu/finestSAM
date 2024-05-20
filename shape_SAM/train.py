@@ -1,13 +1,10 @@
 
 import os
-import cv2
 import time
-import numpy as np
 import lightning as L
 import segmentation_models_pytorch as smp
 import torch
 import torch.nn.functional as F
-import matplotlib.pyplot as plt
 from box import Box
 from model.config import cfg
 from model.dataset import load_datasets
@@ -109,9 +106,10 @@ def train_sam(
             iou_predictions = []
             logits = []
             for item in outputs:
-                #take mask, iou_prediction and low_res_logits from the output
+                # Take mask, iou_prediction and low_res_logits from the output
                 batched_pred_masks.append(item["masks"])
                 iou_predictions.append(item["iou_predictions"])
+                logits.append(item["low_res_logits"])
                 
             num_masks = sum(len(pred_mask) for pred_mask in batched_pred_masks)
 
@@ -129,35 +127,6 @@ def train_sam(
 
                 pred_masks = separated_masks[best_index]
                 iou_prediction = separated_scores[best_index]
-
-                ### STAMPA (ELIMINARE)
-                stamp = pred_masks[2].clone() > 0.0 # elimina il gradiente dalla maschera predetta e trasforma in bool per essere stampata
-                single_frame = data["imo"]
-                annotation_rgb = np.zeros_like(single_frame)
-                annotation_rgb[stamp.squeeze().cpu().numpy()] = [1, 255, 255] 
-                
-                '''
-                if(epoch > 1):
-                  for i,mask in enumerate(pred_masks[2]):
-                    img = data["imo"]
-                    test = test.squeeze()
-                    for p in test[2]:
-                      p = p.cpu().numpy()
-                      x, y = p
-                      x=round(x)
-                      y=round(y)
-                      cv2.circle(img, (x, y), 2, (0, 255, 0), -1)
-                '''
-                
-                # annotation = gt_mask[2].squeeze().cpu().numpy() * 255
-                # annotation_rgb = np.repeat(annotation[..., np.newaxis], 3, axis=2).astype(np.uint8)
-                
-                image_with_annotation = cv2.addWeighted(data["imo"], 1, annotation_rgb, 0.5, 0)
-                plt.imshow(image_with_annotation)
-                plt.axis('off')
-                plt.show()
-                
-                ### FINE STAMPA
 
                 batch_iou = calc_iou(pred_masks, data["gt_masks"])
                 loss_focal += focal_loss(pred_masks, data["gt_masks"], num_masks)
@@ -224,7 +193,7 @@ def main(cfg: Box) -> None:
     current_directory = os.path.dirname(os.path.abspath(__file__))
     cfg.out_dir = os.path.join(current_directory, cfg.out_dir)
 
-    fabric = L.Fabric(accelerator="cpu",
+    fabric = L.Fabric(accelerator="auto",
                       devices=cfg.num_devices,
                       strategy="auto",
                       loggers=[TensorBoardLogger(cfg.out_dir, name="loggers_shape_SAM")])

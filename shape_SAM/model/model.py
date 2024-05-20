@@ -49,6 +49,7 @@ class shape_SAM(nn.Module):
             excluded if it is not present.
               'image': The image as a torch tensor in 3xHxW format,
                 already transformed for input to the model.
+                (H o W devono avere la dimensione minima di self.model.image_encoder.img_size) TRADURRE
               'original_size': (tuple(int, int)) The original size of
                 the image before transformation, as (H, W).
               'point_coords': (torch.Tensor) Batched point prompts for
@@ -60,6 +61,7 @@ class shape_SAM(nn.Module):
                 Already transformed to the input frame of the model.
               'mask_inputs': (torch.Tensor) Batched mask inputs to the model,
                 in the form Bx1xHxW.
+                (devono essere 1/4 della dimensione dell'immagine post trasformazione quindi self.model.image_encoder.img_size//4) TRADURRE
           multimask_output (bool): Whether the model should predict multiple
             disambiguating masks, or return a single mask.
 
@@ -76,11 +78,13 @@ class shape_SAM(nn.Module):
                 shape BxCxHxW, where H=W=256. Can be passed as mask input
                 to subsequent iterations of prediction.
         """
-        input_images = torch.stack([self.model.preprocess(x["image"]) for x in batched_input], dim=0)
+        input_images = torch.stack([self.preprocess(x["image"]) for x in batched_input], dim=0)
         image_embeddings = self.model.image_encoder(input_images)
 
+        input_masks = [self.preprocess(x["mask_inputs"]) for x in batched_input]
+
         outputs = []
-        for image_record, curr_embedding in zip(batched_input, image_embeddings):
+        for image_record, curr_embedding, masks in zip(batched_input, image_embeddings, input_masks):
             if "point_coords" in image_record and image_record["point_coords"] is not None:
                 points = (image_record["point_coords"], image_record["point_labels"])
             else:
@@ -89,7 +93,7 @@ class shape_SAM(nn.Module):
             sparse_embeddings, dense_embeddings = self.model.prompt_encoder(
                 points=points,
                 boxes=image_record.get("boxes", None),
-                masks=image_record.get("mask_inputs", None),
+                masks=masks,
             )
 
             low_res_masks, iou_predictions = self.model.mask_decoder(
@@ -115,6 +119,15 @@ class shape_SAM(nn.Module):
             )
 
         return outputs
+    
+    def preprocess(self, x: torch.Tensor) -> torch.Tensor:
+        """Pad to a square input."""
+        # Pad
+        h, w = x.shape[-2:]
+        padh = self.model.image_encoder.img_size//4 - h
+        padw = self.model.image_encoder.img_size//4 - w
+        x = F.pad(x, (0, padw, 0, padh))
+        return x
     
     def get_predictor(self):
         return SamPredictor(self.model)
