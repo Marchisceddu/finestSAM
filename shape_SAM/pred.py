@@ -3,6 +3,8 @@ import cv2
 import torch
 import numpy as np
 import lightning as L
+import geopandas as gpd
+from shapely.geometry import Polygon
 import matplotlib.pyplot as plt
 from model.utils import (
     show_anns,
@@ -13,7 +15,6 @@ from model.utils import (
 from model.model import shape_SAM
 from model.config import cfg
 from model.dataset import COCODataset
-
 
 def pred_auto(path):
     # Get the image
@@ -45,9 +46,21 @@ def pred_auto(path):
     plt.axis('off')
     plt.show()
 
-    # Save the masks
+    polygons = []
+    for i, mask in enumerate(masks):
+        mask = mask["segmentation"].astype(np.uint8)
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        for contour in contours:
+            epsilon = 0.0001 * cv2.arcLength(contour, True)
+            approx = cv2.approxPolyDP(contour, epsilon, True)
+            points = [(int(point[0][0]), -int(point[0][1])) for point in approx]
+            polygons.append(Polygon(points))
 
+    # Crea un GeoDataFrame utilizzando i poligoni Shapely
+    gdf = gpd.GeoDataFrame(geometry=polygons)
 
+    # Salva il GeoDataFrame in un file Shapefile
+    gdf.to_file("./ouput/output.shp")
 
 def pred_boxes():
     current_directory = os.path.dirname(os.path.abspath(__file__))
@@ -207,5 +220,5 @@ def pred_points():
 
 
 if __name__ == '__main__':
-    #pred_auto('../dataset/images/0.png')
-    pred_points()
+    pred_auto('../dataset/images/0.png')
+    #pred_points()
