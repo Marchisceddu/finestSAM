@@ -114,13 +114,14 @@ def collate_fn(batch):
     for data in batch:
         image, original_size, point_coord, point_label, boxes, masks, resized_masks, imo = data
 
-        if not cfg.use_boxes:
-            boxes = None
-        if not cfg.use_points:
-            point_coord = None
-            point_label = None
-        if not cfg.use_masks:
-            resized_masks = None
+        if cfg.train.type == "custom":
+            if not cfg.train.custom_cfg.use_boxes:
+                boxes = None
+            if not cfg.train.custom_cfg.use_points:
+                point_coord = None
+                point_label = None
+            if not cfg.train.custom_cfg.use_masks:
+                resized_masks = None
 
         batched_data.append({
             "image": image,

@@ -17,9 +17,14 @@ config = {
         "steps": [60000, 86666],
         "warmup_steps": 250,
     },
-    "use_boxes": True,
-    "use_points": True,
-    "use_masks": True,
+    "train": {
+        "type": "11-iteration",
+        "custom_cfg": {
+            "use_boxes": True,
+            "use_points": True,
+            "use_masks": True,
+        },
+    },
     "model": {
         "type": 'vit_h',
         "checkpoint": "sam_vit_h_4b8939.pth",
@@ -29,6 +34,7 @@ config = {
             "mask_decoder": False,
         },
     },
+
     "dataset": {
         "root_dir": "../../dataset/images",
         "annotation_file": "../../dataset/annotations.json",
