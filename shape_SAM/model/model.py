@@ -8,6 +8,7 @@ from typing import Any, Dict, List
 from .segment_anything import sam_model_registry
 from .segment_anything import SamPredictor, SamAutomaticMaskGenerator
 
+import matplotlib.pyplot as plt
 
 class shape_SAM(nn.Module):
 
@@ -36,8 +37,6 @@ class shape_SAM(nn.Module):
         self,
         batched_input: List[Dict[str, Any]],
         multimask_output: bool,
-        train_automatic: bool = True,
-        are_logits: bool = False,
     ) -> List[Dict[str, torch.Tensor]]:
         """
         Predicts masks end-to-end from provided images and prompts.
@@ -50,6 +49,7 @@ class shape_SAM(nn.Module):
             excluded if it is not present.
               'image': The image as a torch tensor in 3xHxW format,
                 already transformed for input to the model.
+                (H o W devono avere la dimensione minima di self.model.image_encoder.img_size) TRADURRE
               'original_size': (tuple(int, int)) The original size of
                 the image before transformation, as (H, W).
               'point_coords': (torch.Tensor) Batched point prompts for
@@ -61,6 +61,7 @@ class shape_SAM(nn.Module):
                 Already transformed to the input frame of the model.
               'mask_inputs': (torch.Tensor) Batched mask inputs to the model,
                 in the form Bx1xHxW.
+                (devono essere 1/4 della dimensione dell'immagine post trasformazione quindi self.model.image_encoder.img_size//4) TRADURRE
           multimask_output (bool): Whether the model should predict multiple
             disambiguating masks, or return a single mask.
 
@@ -77,29 +78,21 @@ class shape_SAM(nn.Module):
                 shape BxCxHxW, where H=W=256. Can be passed as mask input
                 to subsequent iterations of prediction.
         """
-        input_images = torch.stack([self.model.preprocess(x["image"]) for x in batched_input], dim=0)
+        input_images = torch.stack([self.preprocess(x["image"]) for x in batched_input], dim=0)
         image_embeddings = self.model.image_encoder(input_images)
 
-        if are_logits:
-          input_masks = [x["mask_inputs"] for x in batched_input]
-        else:
-          input_masks = [self.preprocess_masks(x["mask_inputs"]) for x in batched_input]            
+        input_masks = [self.preprocess(x["mask_inputs"]) for x in batched_input]
 
         outputs = []
         for image_record, curr_embedding, masks in zip(batched_input, image_embeddings, input_masks):
-            if "point_coords" in image_record:
+            if "point_coords" in image_record and image_record["point_coords"] is not None:
                 points = (image_record["point_coords"], image_record["point_labels"])
             else:
                 points = None
 
-            if train_automatic:
-                boxes = None
-            else:
-                boxes = image_record.get("boxes", None)
-
             sparse_embeddings, dense_embeddings = self.model.prompt_encoder(
                 points=points,
-                boxes=boxes,
+                boxes=image_record.get("boxes", None),
                 masks=masks,
             )
 
@@ -126,9 +119,9 @@ class shape_SAM(nn.Module):
             )
 
         return outputs
-  
-    def preprocess_masks(self, x: torch.Tensor) -> torch.Tensor:
-        """Normalize pixel values and pad to a square input."""
+    
+    def preprocess(self, x: torch.Tensor) -> torch.Tensor:
+        """Pad to a square input."""
         # Pad
         h, w = x.shape[-2:]
         padh = self.model.image_encoder.img_size//4 - h
@@ -137,7 +130,7 @@ class shape_SAM(nn.Module):
         return x
     
     def get_predictor(self):
-        return SamPredictor(model = self.model)
+        return SamPredictor(self.model)
 
     def get_automatic_predictor(self, min_mask_region_area = 0):
         return SamAutomaticMaskGenerator(model = self.model, min_mask_region_area = min_mask_region_area)

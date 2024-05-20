@@ -1,13 +1,14 @@
 from box import Box
 
 config = {
-    "seed": 1337,
+    "seed_device": 1337,
+    "seed_dataloader": None,
     "num_devices": "auto",
     "batch_size": 1,
     "num_workers": 2,
     "num_epochs": 200,
     "k_fold": 5,
-    "eval_interval": 200,
+    "eval_interval": 100,
     "out_dir": "sav",
     "opt": {
         "learning_rate": 8e-4,
@@ -15,6 +16,14 @@ config = {
         "decay_factor": 10,
         "steps": [60000, 86666],
         "warmup_steps": 250,
+    },
+    "train": {
+        "type": "11-iteration",
+        "custom_cfg": {
+            "use_boxes": True,
+            "use_points": True,
+            "use_masks": True,
+        },
     },
     "model": {
         "type": 'vit_h',
@@ -25,10 +34,11 @@ config = {
             "mask_decoder": False,
         },
     },
+
     "dataset": {
         "root_dir": "../../dataset/images",
         "annotation_file": "../../dataset/annotations.json",
-        "positive_points": 8,
+        "positive_points": 1,
         "negative_points": 0,
         
         "train": {
@@ -44,6 +54,5 @@ config = {
 
 #ATTENZIONE
 # train e val in dataset vanno eliminati in teoria e sostituiti con lo split del dataset in dataset.py
-# Ho messo 1 e zero perchè nel paper c'è scritto che usa solo un punto ma non ho capito nulla
 
 cfg = Box(config)
