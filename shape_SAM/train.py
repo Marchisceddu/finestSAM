@@ -202,7 +202,7 @@ def train_11_teration(
 
         random_number = np.random.randint(2, 11)
 
-        for iteration in range(1, 12): # Fa 11 iterazioni per ogni epoca come scritto nel paper
+        for iteration in range(1, 12): # Fa 11 iterazioni per ogni epoca come scritto nel paper # opt
 
             are_logits = True if iteration > 1 else False
             only_logits = True if iteration == random_number or iteration == 11 else False
@@ -229,7 +229,7 @@ def train_11_teration(
                     new_point_coords = []
                     new_point_labels = []
 
-                outputs = model(batched_input=batched_data, multimask_output=True, are_logits=are_logits) # VERO BISOGNA MODIFICARE IL MODELLO PER QUESTO COSO
+                outputs = model(batched_input=batched_data, multimask_output=True, are_logits=are_logits)
 
                 batched_pred_masks = []
                 iou_predictions = []
@@ -259,7 +259,7 @@ def train_11_teration(
                     iou_prediction = separated_scores[best_index]
                     new_logits.append(separated_logits[best_index])
 
-                    p, l = calc_points_train(pred_masks,  data["gt_masks"], model.model.image_encoder.img_size, data["original_size"], fabric.device)
+                    p, l = calc_points_train(pred_masks,  data["gt_masks"], model.model.image_encoder.img_size, data["original_size"], fabric.device) # opt
                     new_point_coords.append(p)
                     new_point_labels.append(l)
 
@@ -326,8 +326,8 @@ def configure_opt(cfg: Box, model: shape_SAM):
 
 
 def main(cfg: Box) -> None:
-    current_directory = os.path.dirname(os.path.abspath(__file__))
-    cfg.out_dir = os.path.join(current_directory, cfg.out_dir)
+    main_directory = os.path.dirname(os.path.abspath(__file__))
+    cfg.out_dir = os.path.join(main_directory, cfg.out_dir)
 
     fabric = L.Fabric(accelerator="auto",
                       devices=cfg.num_devices,
@@ -352,10 +352,12 @@ def main(cfg: Box) -> None:
     optimizer, scheduler = configure_opt(cfg, model)
     model, optimizer = fabric.setup(model, optimizer)
 
-    if cfg.train.type == "11-iteration":
+    if cfg.train_type == "custom":
+        train_custom(cfg, fabric, model, optimizer, scheduler, train_data, val_data)
+    elif cfg.train_type == "11-iteration":
         train_11_teration(cfg, fabric, model, optimizer, scheduler, train_data, val_data)
     else:
-        train_custom(cfg, fabric, model, optimizer, scheduler, train_data, val_data)
+        raise ValueError(f"Unknown training type: {cfg.train_type}")
     #validate(fabric, model, train_data, epoch=0)
 
 

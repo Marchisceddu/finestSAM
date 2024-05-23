@@ -6,8 +6,11 @@ import torchvision.transforms as transforms
 import torch.nn.functional as F
 from pycocotools.coco import COCO
 from .segment_anything.utils.transforms import ResizeLongestSide
-from torch.utils.data import DataLoader
-from torch.utils.data import Dataset
+from torch.utils.data import (
+    Dataset,
+    DataLoader,
+    random_split
+)
 from .config import cfg
 
 class COCODataset(Dataset):
@@ -35,7 +38,6 @@ class COCODataset(Dataset):
         image_path = os.path.join(self.root_dir, image_info['file_name'])
         image = cv2.imread(image_path)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        imo = image.copy()
 
         # Get original size of the image
         H, W, _ = image.shape
@@ -105,22 +107,22 @@ class COCODataset(Dataset):
 
         resized_masks = resized_masks.unsqueeze(1)
         
-        return image, original_size, point_coords, point_labels, boxes, masks, resized_masks, imo
+        return image, original_size, point_coords, point_labels, boxes, masks, resized_masks
     
 
 def collate_fn(batch):
     batched_data = []
 
     for data in batch:
-        image, original_size, point_coord, point_label, boxes, masks, resized_masks, imo = data
+        image, original_size, point_coord, point_label, boxes, masks, resized_masks = data
 
-        if cfg.train.type == "custom":
-            if not cfg.train.custom_cfg.use_boxes:
+        if cfg.train_type == "custom":
+            if not cfg.custom_cfg.use_boxes:
                 boxes = None
-            if not cfg.train.custom_cfg.use_points:
+            if not cfg.custom_cfg.use_points:
                 point_coord = None
                 point_label = None
-            if not cfg.train.custom_cfg.use_masks:
+            if not cfg.custom_cfg.use_masks:
                 resized_masks = None
 
         batched_data.append({
@@ -153,7 +155,7 @@ class ResizeAndPad:
         # Resize masks to 1/4th resolution of the image 
         resized_masks = []
         for mask in masks:
-            # CAPITRE SE METTENDO FLOAT POI SI DEVE RICONVERTIRE IN BYTE?
+            # CAPITRE SE SERVE LA CONVERSIONE IN FLOAT
             mask = F.max_pool2d(mask.unsqueeze(0).unsqueeze(0).float(), kernel_size=4, stride=4).squeeze()
             resized_masks.append(mask)
 
@@ -168,31 +170,32 @@ def load_datasets(cfg, img_size):
     transform = ResizeAndPad(img_size)
 
     # Ottiene il percorso del dataset
-    current_file_path = os.path.abspath(__file__)
-    current_directory = os.path.dirname(current_file_path)
-    dataset_path = os.path.join(current_directory, cfg.dataset.root_dir)
-    annotations_path = os.path.join(current_directory, cfg.dataset.annotation_file)
+    main_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    dataset_path = os.path.join(main_directory, cfg.dataset.root_dir)
+    annotations_path = os.path.join(main_directory, cfg.dataset.annotation_file)
 
-    train = COCODataset(root_dir=dataset_path,
+    data = COCODataset(root_dir=dataset_path,
                         annotation_file=annotations_path,
                         transform=transform,
                         seed=cfg.seed_dataloader)
     
-    train_dataloader = DataLoader(train,
+    # Calcola le dimensioni per i dataset di training e di validazione
+    total_size = len(data)
+    val_size = int(total_size * cfg.val_size)
+
+    # Dividi il dataset in training set e validation set
+    train_data, val_data = random_split(data, [total_size - val_size, val_size])
+
+    train_dataloader = DataLoader(train_data,
                                   batch_size=cfg.batch_size,
                                   shuffle=True,
                                   num_workers=cfg.num_workers,
                                   collate_fn=collate_fn)
-    
-    # CREARE FUNZIONE PER PRENDERE IL 10/20% DEL DATASET PER LA VALIDAZIONE 
-    # val = COCODataset(root_dir=cfg.dataset.root_dir,
-    #                   annotation_file=cfg.dataset.annotation_file,
-    #                   transform=transform)
-    # val_dataloader = DataLoader(val,
-    #                             batch_size=cfg.batch_size,
-    #                             shuffle=True,
-    #                             num_workers=cfg.num_workers,
-    #                             collate_fn=collate_fn)
-    val_dataloader = DataLoader # per ora restituisce una roba vuota
+
+    val_dataloader = DataLoader(val_data,
+                                batch_size=cfg.batch_size,
+                                shuffle=False,
+                                num_workers=cfg.num_workers,
+                                collate_fn=collate_fn)
 
     return train_dataloader, val_dataloader

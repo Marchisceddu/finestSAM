@@ -18,8 +18,8 @@ from model.dataset import COCODataset
 
 def pred_auto(path):
     # Get the image
-    current_directory = os.path.dirname(os.path.abspath(__file__))
-    image_path = os.path.join(current_directory, path)
+    main_directory = os.path.dirname(os.path.abspath(__file__))
+    image_path = os.path.join(main_directory, path)
 
     image = cv2.imread(image_path)
 
@@ -63,7 +63,7 @@ def pred_auto(path):
     gdf.to_file("./ouput/output.shp")
 
 def pred_boxes():
-    current_directory = os.path.dirname(os.path.abspath(__file__))
+    main_directory = os.path.dirname(os.path.abspath(__file__))
 
     # Load the model 
     fabric = L.Fabric(accelerator="auto",
@@ -78,8 +78,8 @@ def pred_boxes():
         model.to(fabric.device)
 
     # Get the dataset for boxes
-    dataset_path = os.path.join(current_directory, cfg.dataset.root_dir)
-    annotations_path = os.path.join(current_directory, cfg.dataset.annotation_file)
+    dataset_path = os.path.join(main_directory, cfg.dataset.root_dir)
+    annotations_path = os.path.join(main_directory, cfg.dataset.annotation_file)
 
     dataset = COCODataset(root_dir=dataset_path,
                           annotation_file=annotations_path,
@@ -125,7 +125,7 @@ def pred_boxes():
 
 
 def pred_points():
-    current_directory = os.path.dirname(os.path.abspath(__file__))
+    main_directory = os.path.dirname(os.path.abspath(__file__))
 
     # Load the model 
     fabric = L.Fabric(accelerator="auto",
@@ -140,8 +140,8 @@ def pred_points():
         model.to(fabric.device)
 
     # Get the dataset for boxes
-    dataset_path = os.path.join(current_directory, cfg.dataset.root_dir)
-    annotations_path = os.path.join(current_directory, cfg.dataset.annotation_file)
+    dataset_path = os.path.join(main_directory, cfg.dataset.root_dir)
+    annotations_path = os.path.join(main_directory, cfg.dataset.annotation_file)
 
     dataset = COCODataset(root_dir=dataset_path,
                           annotation_file=annotations_path,

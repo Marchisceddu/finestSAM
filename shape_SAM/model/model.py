@@ -2,13 +2,9 @@ import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
 from typing import Any, Dict, List
-
 from .segment_anything import sam_model_registry
 from .segment_anything import SamPredictor, SamAutomaticMaskGenerator
-
-import matplotlib.pyplot as plt
 
 class shape_SAM(nn.Module):
 
@@ -37,6 +33,7 @@ class shape_SAM(nn.Module):
         self,
         batched_input: List[Dict[str, Any]],
         multimask_output: bool,
+        are_logits: bool = False
     ) -> List[Dict[str, torch.Tensor]]:
         """
         Predicts masks end-to-end from provided images and prompts.
@@ -81,7 +78,10 @@ class shape_SAM(nn.Module):
         input_images = torch.stack([self.preprocess(x["image"]) for x in batched_input], dim=0)
         image_embeddings = self.model.image_encoder(input_images)
 
-        input_masks = [self.preprocess(x["mask_inputs"]) for x in batched_input]
+        if are_logits:
+          input_masks = [x["mask_inputs"] for x in batched_input]
+        else:
+          input_masks = [self.preprocess(x["mask_inputs"]) for x in batched_input]    
 
         outputs = []
         for image_record, curr_embedding, masks in zip(batched_input, image_embeddings, input_masks):
