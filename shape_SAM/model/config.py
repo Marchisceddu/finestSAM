@@ -18,7 +18,7 @@ config = {
         "warmup_steps": 250,
     },
     "train": {
-        "type": "11-iteration",
+        "type": "custom",
         "custom_cfg": {
             "use_boxes": True,
             "use_points": True,

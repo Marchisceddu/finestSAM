@@ -124,8 +124,9 @@ class shape_SAM(nn.Module):
         """Pad to a square input."""
         # Pad
         h, w = x.shape[-2:]
-        padh = self.model.image_encoder.img_size//4 - h
-        padw = self.model.image_encoder.img_size//4 - w
+        img_size = max(h, w) 
+        padh = img_size - h
+        padw = img_size - w
         x = F.pad(x, (0, padw, 0, padh))
         return x
     

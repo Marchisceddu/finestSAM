@@ -229,7 +229,7 @@ def train_11_teration(
                     new_point_coords = []
                     new_point_labels = []
 
-                outputs = model(batched_input=batched_data, multimask_output=True, are_logits=are_logits)
+                outputs = model(batched_input=batched_data, multimask_output=True, are_logits=are_logits) # VERO BISOGNA MODIFICARE IL MODELLO PER QUESTO COSO
 
                 batched_pred_masks = []
                 iou_predictions = []
