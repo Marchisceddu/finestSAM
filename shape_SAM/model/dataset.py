@@ -181,7 +181,7 @@ def load_datasets(cfg, img_size):
     
     # Calcola le dimensioni per i dataset di training e di validazione
     total_size = len(data)
-    val_size = int(total_size * cfg.val_size)
+    val_size = int(total_size * cfg.dataset.val_size)
 
     # Dividi il dataset in training set e validation set
     train_data, val_data = random_split(data, [total_size - val_size, val_size])

@@ -13,9 +13,9 @@ config = {
     "num_epochs": 200,
     "eval_interval": 100,
     "custom_cfg": {
-            "use_boxes": True,
-            "use_points": True,
-            "use_masks": True,
+        "use_boxes": True,
+        "use_points": True,
+        "use_masks": True,
     },
     "cross-validation_cfg": { 
         "k_fold": 5,
@@ -27,6 +27,7 @@ config = {
         "decay_factor": 10,
         "steps": [60000, 86666],
         "warmup_steps": 250,
+        "focal_alpha": 20.,
     },
 
     "model": {
@@ -43,8 +44,8 @@ config = {
         "root_dir": "../dataset/images",
         "annotation_file": "../dataset/annotations.json",
         "val_size": 0.2,
-        "positive_points": 1,
-        "negative_points": 0,
+        "positive_points": 4,
+        "negative_points": 4,
     }
 }
 
