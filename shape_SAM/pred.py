@@ -28,7 +28,7 @@ def pred_auto(path):
                     devices=cfg.num_devices,
                     strategy="auto")
     fabric.launch()
-    fabric.seed_everything(cfg.seed_device)
+    fabric.seed_everything(cfg.seed_device) 
 
     with fabric.device:
         model = shape_SAM(cfg)
@@ -44,23 +44,34 @@ def pred_auto(path):
     plt.imshow(image)
     show_anns(masks, opacity=1)
     plt.axis('off')
-    plt.show()
 
     polygons = []
     for i, mask in enumerate(masks):
         mask = mask["segmentation"].astype(np.uint8)
-        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        for contour in contours:
-            epsilon = 0.0001 * cv2.arcLength(contour, True)
-            approx = cv2.approxPolyDP(contour, epsilon, True)
-            points = [(int(point[0][0]), -int(point[0][1])) for point in approx]
-            polygons.append(Polygon(points))
 
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_TC89_L1)
+        
+        for contour in contours:
+          epsilon = 0.01 * cv2.arcLength(contour, True) # Epsilon dovrebbe essere un iperparametro modificabile
+          approx = cv2.approxPolyDP(contour, epsilon, True)
+          points = [(int(point[0][0]), -int(point[0][1])) for point in approx]
+          polygons.append(Polygon(points))
+                  
+    
     # Crea un GeoDataFrame utilizzando i poligoni Shapely
     gdf = gpd.GeoDataFrame(geometry=polygons)
 
     # Salva il GeoDataFrame in un file Shapefile
-    gdf.to_file("./ouput/output.shp")
+    gdf.to_file("./output/output.shp")
+    
+    #stesso procedimento ma salvando un file vettoriale svg per vedere meglio
+    fig, ax = plt.subplots()
+    gdf.boundary.plot(ax=ax)
+    ax.set_aspect('equal')
+    ax.axis('off')
+    ax.set_xticks([])
+    plt.savefig("./output.svg")
+    plt.show()
 
 def pred_boxes():
     main_directory = os.path.dirname(os.path.abspath(__file__))
