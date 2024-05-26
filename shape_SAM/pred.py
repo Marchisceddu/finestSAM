@@ -112,7 +112,9 @@ def pred_boxes():
             x, y, w, h = ann['bbox']
             bboxes.append([x, y, x + w, y + h])
         bboxes = torch.as_tensor(bboxes, device=model.model.device)
-        transformed_boxes = predictor.transform.apply_boxes_torch(bboxes, image.shape[:2])
+        transformed_boxes = predictor.transform.apply_boxes_torch(bboxes, image.shape[:2]) 
+
+        print(transformed_boxes)
 
         predictor.set_image(image)
         masks, _, _ = predictor.predict_torch(
@@ -207,7 +209,6 @@ def pred_points():
         point_coords = torch.as_tensor(point_coords, device=model.model.device)
         point_coords = predictor.transform.apply_coords_torch(point_coords, image.shape[:2])
         point_labels = torch.as_tensor(point_labels, dtype=torch.int, device=model.model.device)
-        
 
         predictor.set_image(image)
         masks, scores, _ = predictor.predict_torch(
@@ -231,5 +232,5 @@ def pred_points():
 
 
 if __name__ == '__main__':
-    pred_auto('../dataset/images/0.png')
-    #pred_points()
+    #pred_auto('../dataset/images/0.png')
+    pred_boxes()

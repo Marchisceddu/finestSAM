@@ -4,6 +4,7 @@ import torch
 import numpy as np
 import lightning as L
 import torch.nn.functional as F
+import segmentation_models_pytorch as smp
 from .segment_anything.utils.transforms import ResizeLongestSide
 from .model import shape_SAM
 from .utils import AverageMeter
@@ -16,6 +17,53 @@ from typing import Dict, List, Tuple
 from box import Box
 from lightning.fabric.fabric import _FabricOptimizer
 from torch.utils.data import DataLoader
+
+
+def validate(fabric: L.Fabric, 
+             cfg: Box,
+             model: shape_SAM, 
+             val_dataloader: DataLoader, 
+             epoch: int,
+    ): 
+    model.eval()
+    ious = AverageMeter()
+    
+    for iter, batched_data in enumerate(val_dataloader):
+
+        predictor = model.get_predictor()
+        pred_masks = []
+        gt_masks = [data["gt_masks"] for data in batched_data]  
+        num_images = len(batched_data)
+        for data in batched_data:
+            predictor.set_image(data["image"])
+            masks, _, _ = predictor.predict_torch(
+                point_coords=data["point_coords"],
+                point_labels=data["point_labels"],
+                boxes=None,
+                multimask_output=False,
+            )
+            pred_masks.append(masks)
+
+        for pred_mask, gt_mask in zip(pred_masks, gt_masks):
+            batch_stats = smp.metrics.get_stats(
+                pred_mask,
+                gt_mask.int(),
+                mode='binary',
+                threshold=0.5,
+            )
+            batch_iou = smp.metrics.iou_score(*batch_stats, reduction="micro-imagewise")
+            ious.update(batch_iou, num_images)
+        fabric.print(
+            f'Val: [{epoch}] - [{iter}/{len(val_dataloader)}]: Mean IoU: [{ious.avg:.4f}]'
+        )
+
+    fabric.print(f'Validation [{epoch}]: Mean IoU: [{ious.avg:.4f}]')
+
+    fabric.print(f"Saving checkpoint to {cfg.out_dir}")
+    state_dict = model.model.state_dict()
+    if fabric.global_rank == 0:
+        torch.save(state_dict, os.path.join(cfg.out_dir, f"epoch-{epoch:06d}-ckpt.pth"))
+    model.train()
 
 
 def configure_opt(cfg: Box, model: shape_SAM) -> Tuple[_FabricOptimizer, _FabricOptimizer]:
@@ -109,8 +157,8 @@ class Train_custom():
                 self.iteration_results(epoch, iter, batch_time, data_time, focal_losses, dice_losses, iou_losses, total_losses, best_score)
 
             if (epoch > 1 and self.cfg.eval_interval > 0 and epoch % self.cfg.eval_interval == 0) or (epoch == self.cfg.num_epochs):
-                #validate(fabric, model, val_dataloader, epoch)
-                save(self.fabric, self.model, self.cfg, epoch)
+                validate(self.fabric, self.cfg, self.model, self.val_dataloader, epoch)
+                #save(self.fabric, self.model, self.cfg, epoch)
 
     def calc_losses(self, 
                     outputs: List[Dict[str, torch.Tensor]], 
@@ -273,7 +321,7 @@ class Train_11_iterations(Train_custom):
     def calc_losses(self, 
                     outputs: List[Dict[str, torch.Tensor]], 
                     batched_data: Dict[str, torch.Tensor],
-        ) -> Tuple[torch.Tensor | int]:
+        ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, int]:
 
         batched_pred_masks = []
         batched_iou_predictions = []

@@ -5,13 +5,13 @@ config = {
     "seed_dataloader": None,
 
     "num_devices": "auto",
-    "batch_size": 1,
+    "batch_size": 2,
     "num_workers": 2,
     "out_dir": "sav",
 
     "train_type": "custom",
     "num_epochs": 200,
-    "eval_interval": 100,
+    "eval_interval": 2,
     "custom_cfg": {
         "use_boxes": True,
         "use_points": True,
@@ -41,9 +41,9 @@ config = {
     },
 
     "dataset": {
-        "root_dir": "../dataset/images",
-        "annotation_file": "../dataset/annotations.json",
-        "val_size": 0.2,
+        "root_dir": "../dataset3/images",
+        "annotation_file": "../dataset3/annotations.json",
+        "val_size": 0,
         "positive_points": 4,
         "negative_points": 4,
     }
