@@ -4,15 +4,13 @@ import lightning as L
 from model.config import cfg
 from model.dataset import load_datasets
 from model.model import shape_SAM
-from model.utils import AverageMeter
 from model.train import (
-    Train_custom, 
-    Train_11_iterations,
+    train_custom, 
+    train_11_iterations,
     configure_opt
 )
 from box import Box
 from lightning.fabric.loggers import TensorBoardLogger
-from torch.utils.data import DataLoader
 
 torch.autograd.set_detect_anomaly(True)
 torch.set_float32_matmul_precision('high')
@@ -45,15 +43,13 @@ def main(cfg: Box) -> None:
     optimizer, scheduler = configure_opt(cfg, model)
     model, optimizer = fabric.setup(model, optimizer)
 
-    train = None
     if cfg.train_type == "custom":
-        train = Train_custom(cfg, fabric, model, optimizer, scheduler, train_data, val_data)
+        train_custom(cfg, fabric, model, optimizer, scheduler, train_data, val_data)
     elif cfg.train_type == "11-iteration":
-        train = Train_11_iterations(cfg, fabric, model, optimizer, scheduler, train_data, val_data)
+        train_11_iterations(cfg, fabric, model, optimizer, scheduler, train_data, val_data)
     else:
         raise ValueError(f"Unknown training type: {cfg.train_type}")
     
-    train()
     #validate(fabric, cfg, model, train_data, epoch=0)
 
 
