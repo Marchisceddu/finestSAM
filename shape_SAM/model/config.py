@@ -1,6 +1,7 @@
 from box import Box
 
 config = {
+    "device": "auto",
     "seed_device": 1337,
     "seed_dataloader": None,
 

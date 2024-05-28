@@ -13,17 +13,36 @@ from .losses import (
     DiceLoss,
     FocalLoss
 )
-from typing import Dict, List, Tuple
+from typing import Tuple
 from box import Box
 from lightning.fabric.fabric import _FabricOptimizer
 from torch.utils.data import DataLoader
 
 
-def validate(fabric: L.Fabric, 
-             cfg: Box,
-             model: shape_SAM, 
-             val_dataloader: DataLoader, 
-             epoch: int,
+def configure_opt(cfg: Box, model: shape_SAM) -> Tuple[_FabricOptimizer, _FabricOptimizer]:
+
+    def lr_lambda(step):
+        if step < cfg.opt.warmup_steps:
+            return step / cfg.opt.warmup_steps
+        elif step < cfg.opt.steps[0]:
+            return 1.0
+        elif step < cfg.opt.steps[1]:
+            return 1 / cfg.opt.decay_factor
+        else:
+            return 1 / (cfg.opt.decay_factor**2)
+
+    optimizer = torch.optim.Adam(model.model.parameters(), lr=cfg.opt.learning_rate, weight_decay=cfg.opt.weight_decay)
+    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
+
+    return optimizer, scheduler
+
+
+def validate(
+        fabric: L.Fabric, 
+        cfg: Box,
+        model: shape_SAM, 
+        val_dataloader: DataLoader, 
+        epoch: int,
     ): 
     model.eval()
     ious = AverageMeter()
@@ -58,44 +77,20 @@ def validate(fabric: L.Fabric,
         )
 
     fabric.print(f'Validation [{epoch}]: Mean IoU: [{ious.avg:.4f}]')
-
-    fabric.print(f"Saving checkpoint to {cfg.out_dir}")
-    state_dict = model.model.state_dict()
-    if fabric.global_rank == 0:
-        torch.save(state_dict, os.path.join(cfg.out_dir, f"epoch-{epoch:06d}-ckpt.pth"))
+    save(fabric, model, cfg, epoch)
     model.train()
-
-
-def configure_opt(cfg: Box, model: shape_SAM) -> Tuple[_FabricOptimizer, _FabricOptimizer]:
-
-    def lr_lambda(step):
-        if step < cfg.opt.warmup_steps:
-            return step / cfg.opt.warmup_steps
-        elif step < cfg.opt.steps[0]:
-            return 1.0
-        elif step < cfg.opt.steps[1]:
-            return 1 / cfg.opt.decay_factor
-        else:
-            return 1 / (cfg.opt.decay_factor**2)
-
-    optimizer = torch.optim.Adam(model.model.parameters(), lr=cfg.opt.learning_rate, weight_decay=cfg.opt.weight_decay)
-    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
-
-    return optimizer, scheduler
 
 
 def save(
     fabric: L.Fabric, 
     model: shape_SAM, 
-    cfg: Box,
-    epoch: int = 0, # andrà eliminato l'assegnamento a 0
-    f1_scores: AverageMeter = AverageMeter(), # andrà eliminato l'assegnamento ad AverageMeter() (vedere se lasciare f1_score comme metrica)
+    out_dir: str,
+    epoch: int,
 ):
-    fabric.print(f"Saving checkpoint to {cfg.out_dir}")
+    fabric.print(f"Saving checkpoint to {out_dir}")
     state_dict = model.model.state_dict()
     if fabric.global_rank == 0:
-        torch.save(state_dict, os.path.join(cfg.out_dir, f"epoch-{epoch:06d}-f1{f1_scores.avg:.2f}-ckpt.pth"))
-    model.train()
+        torch.save(state_dict, os.path.join(out_dir, f"epoch-{epoch:06d}-ckpt.pth"))
 
 
 def train_custom(
@@ -193,10 +188,9 @@ def train_custom(
 
         if (epoch > 1 and cfg.eval_interval > 0 and epoch % cfg.eval_interval == 0) or (epoch == cfg.num_epochs):
             validate(fabric, cfg, model, val_dataloader, epoch)
-            #save(fabric, model, cfg, epoch)
 
 
-def train_11_teration(
+def train_11_iterations(
     cfg: Box,
     fabric: L.Fabric,
     model: shape_SAM,
@@ -328,9 +322,16 @@ def train_11_teration(
 
         if (epoch > 1 and cfg.eval_interval > 0 and epoch % cfg.eval_interval == 0) or (epoch == cfg.num_epochs):
             validate(fabric, cfg, model, val_dataloader, epoch)
-            #save(fabric, model, cfg, epoch)
 
-def calc_points_train(pred_mask: torch.Tensor, gt_mask: torch.Tensor, img_size: int, original_size: tuple, device: torch.device, cfg: Box):
+
+def calc_points_train(
+        pred_mask: torch.Tensor, 
+        gt_mask: torch.Tensor, 
+        img_size: int,
+        original_size: tuple, 
+        device: torch.device, 
+        cfg: Box
+    ):
     transform = ResizeLongestSide(img_size)
 
     pred_mask = (pred_mask >= 0.5).float()

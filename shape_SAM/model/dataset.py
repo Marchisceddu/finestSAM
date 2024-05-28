@@ -13,6 +13,7 @@ from torch.utils.data import (
 )
 from .config import cfg
 
+
 class COCODataset(Dataset):
 
     def __init__(self, root_dir, annotation_file, transform=None, seed=None):

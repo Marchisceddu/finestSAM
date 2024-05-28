@@ -24,7 +24,7 @@ def pred_auto(path):
     image = cv2.imread(image_path)
 
     # Load the model 
-    fabric = L.Fabric(accelerator="auto",
+    fabric = L.Fabric(accelerator=cfg.device,
                     devices=cfg.num_devices,
                     strategy="auto")
     fabric.launch()
@@ -77,7 +77,7 @@ def pred_boxes():
     main_directory = os.path.dirname(os.path.abspath(__file__))
 
     # Load the model 
-    fabric = L.Fabric(accelerator="auto",
+    fabric = L.Fabric(accelerator=cfg.device,
                     devices=cfg.num_devices,
                     strategy="auto")
     fabric.launch()
@@ -141,7 +141,7 @@ def pred_points():
     main_directory = os.path.dirname(os.path.abspath(__file__))
 
     # Load the model 
-    fabric = L.Fabric(accelerator="auto",
+    fabric = L.Fabric(accelerator=cfg.device,
                     devices=cfg.num_devices,
                     strategy="auto")
     fabric.launch()

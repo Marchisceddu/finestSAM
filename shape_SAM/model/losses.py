@@ -13,7 +13,7 @@ class DiceLoss(nn.Module):
     def __init__(self, weight=None, size_average=True):
         super().__init__()
 
-    def forward(self, inputs, targets,num_masks, smooth=1):
+    def forward(self, inputs, targets, num_masks, smooth=1):
         """
         Compute the DICE loss, similar to generalized IOU for masks
         Args:

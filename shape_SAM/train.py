@@ -20,7 +20,7 @@ def main(cfg: Box) -> None:
     main_directory = os.path.dirname(os.path.abspath(__file__))
     cfg.out_dir = os.path.join(main_directory, cfg.out_dir)
 
-    fabric = L.Fabric(accelerator="auto",
+    fabric = L.Fabric(accelerator=cfg.device,
                       devices=cfg.num_devices,
                       strategy="auto",
                       loggers=[TensorBoardLogger(cfg.out_dir, name="loggers_shape_SAM")])
@@ -49,8 +49,6 @@ def main(cfg: Box) -> None:
         train_11_iterations(cfg, fabric, model, optimizer, scheduler, train_data, val_data)
     else:
         raise ValueError(f"Unknown training type: {cfg.train_type}")
-    
-    #validate(fabric, cfg, model, train_data, epoch=0)
 
 
 if __name__ == "__main__":
