@@ -70,54 +70,54 @@ Per cambiare le impostazioni modificare il file [Shape_SAM/config.py](https://gi
 <br>
 
 ```python
-"device": str = "auto" or "gpu" or "cpu" # Hardware su cui eseguire il modello (non è supportata mps, se si usa un mac m1 impostare su cpu)
-"seed_device": int / None per random
-"seed_dataloader": int / None per random
+"device": str = "auto" or "gpu" or "cpu", # Hardware su cui eseguire il modello (non è supportata mps, se si usa un mac m1 impostare su cpu)
+"seed_device": int / None per random,
+"seed_dataloader": int / None per random,
 
 "num_devices": int # Numero di dispositivi da utilizzare
                (lista str) # definire queli GPU utilizzare
-                str = "auto"
-"batch_size": int # Grandezza batch delle immagini
-"num_workers": int # Quanti sottoprocessi utilizzare per il caricamento dei dati (0 -> i dati verranno caricati nel processo principale)
-"out_dir": str # Cartella di output per i salvsataggi e di caricamento checkpoint
+                str = "auto",
+"batch_size": int, # Grandezza batch delle immagini
+"num_workers": int, # Quanti sottoprocessi utilizzare per il caricamento dei dati (0 -> i dati verranno caricati nel processo principale)
+"out_dir": str, # Cartella di output per i salvsataggi e di caricamento checkpoint
 
-"train_type": str = "custom" or "11_iterations"
-"num_epochs": int # Numero di epoche di train
-"eval_interval": int # Intervallo di validazione
+"train_type": str = "custom" or "11_iterations",
+"num_epochs": int, # Numero di epoche di train
+"eval_interval": int, # Intervallo di validazione
 "custom_cfg": {
-    "use_boxes": bool # Se True usa le boxe per il train
-    "use_points": bool # Se True usa i punti per il train
-    "use_masks": bool # Se True usa le annotazioni per il train
+    "use_boxes": bool, # Se True usa le boxe per il train
+    "use_points": bool, # Se True usa i punti per il train
+    "use_masks": bool, # Se True usa le annotazioni per il train
 },
 "cross-validation_cfg": { 
-    "k_fold": int # (DA INSERIRE)
+    "k_fold": int, # (DA INSERIRE)
 },
 
 "opt": {
-    "learning_rate": int
-    "weight_decay": int
-    "decay_factor": int
-    "steps": [int, int]
-    "warmup_steps": int
-    "focal_alpha": float # Peso di Focal loss sulla loss totale
+    "learning_rate": int,
+    "weight_decay": int,
+    "decay_factor": int,
+    "steps": [int, int],
+    "warmup_steps": int,
+    "focal_alpha": float, # Peso di Focal loss sulla loss totale
 },
 
 "model": {
-    "type": str = "vit_h" or "vit_l" or "vit_b"
-    "checkpoint": str # Nome checkpoint formato -> nome.pth
+    "type": str = "vit_h" or "vit_l" or "vit_b",
+    "checkpoint": str, # Nome checkpoint formato -> nome.pth
     "freeze": {
-        "image_encoder": bool # Se True freez del livello
-        "prompt_encoder": bool # Se True freez del livello
-        "mask_decoder": bool # Se True freez del livello
+        "image_encoder": bool, # Se True freez del livello
+        "prompt_encoder": bool, # Se True freez del livello
+        "mask_decoder": bool, # Se True freez del livello
     },
 },
 
 "dataset": {
-    "root_dir": str # Path per la cartella delle immagini del dataset
-    "annotation_file": str # Path per la cartella delle annotazioni del dataset
-    "val_size": float # Percentuale grandezza validation dataset
-    "positive_points": int # Numero punti positivi passati con __getitem__
-    "negative_points": int # Numero punti negativi passati con __getitem__
+    "root_dir": str, # Path per la cartella delle immagini del dataset
+    "annotation_file": str, # Path per la cartella delle annotazioni del dataset
+    "val_size": float, # Percentuale grandezza validation dataset
+    "positive_points": int, # Numero punti positivi passati con __getitem__
+    "negative_points": int, # Numero punti negativi passati con __getitem__
 }
 ```
 
