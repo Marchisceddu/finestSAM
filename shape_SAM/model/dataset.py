@@ -4,6 +4,8 @@ import torch
 import numpy as np
 import torchvision.transforms as transforms
 import torch.nn.functional as F
+from typing import Tuple, List
+from box import Box
 from pycocotools.coco import COCO
 from .segment_anything.utils.transforms import ResizeLongestSide
 from torch.utils.data import (
@@ -16,7 +18,13 @@ from .config import cfg
 
 class COCODataset(Dataset):
 
-    def __init__(self, root_dir, annotation_file, transform=None, seed=None):
+    def __init__(
+            self, 
+            root_dir: str, 
+            annotation_file: str, 
+            transform: transforms.Compose = None, 
+            seed: int = None
+        ):
         self.seed = seed
         self.root_dir = root_dir
         self.transform = transform
@@ -29,7 +37,7 @@ class COCODataset(Dataset):
     def __len__(self):
         return len(self.image_ids)
     
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, Tuple[int, int], torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         # Set the seed for reproducibility
         np.random.seed(self.seed)
 
@@ -111,7 +119,41 @@ class COCODataset(Dataset):
         return image, original_size, point_coords, point_labels, boxes, masks, resized_masks
     
 
-def collate_fn(batch):
+class ResizeAndPad:
+
+    def __init__(self, target_size: int):
+        self.target_size = target_size
+        self.transform = ResizeLongestSide(target_size)
+        self.to_tensor = transforms.ToTensor()
+
+    def __call__(
+            self, 
+            image: np.ndarray, 
+            masks: List[np.ndarray], 
+            boxes: np.ndarray, 
+            point_coords: np.ndarray
+        ) -> Tuple[torch.Tensor, List[torch.Tensor], torch.Tensor, torch.Tensor]:
+        # Resize image and masks
+        og_h, og_w, _ = image.shape
+        image = self.transform.apply_image(image)
+        masks = [torch.tensor(self.transform.apply_image(mask)) for mask in masks]        
+        image = self.to_tensor(image)
+
+        # Resize masks to 1/4th resolution of the image 
+        resized_masks = []
+        for mask in masks:
+            # CAPITRE SE SERVE LA CONVERSIONE IN FLOAT
+            mask = F.max_pool2d(mask.unsqueeze(0).unsqueeze(0).float(), kernel_size=4, stride=4).squeeze()
+            resized_masks.append(mask)
+
+        # Adjust bounding boxes and point coordinates
+        boxes = self.transform.apply_boxes(boxes, (og_h, og_w))
+        point_coords = self.transform.apply_coords(point_coords, (og_h, og_w))
+
+        return image, resized_masks, boxes, point_coords
+
+
+def collate_fn(batch: List[Tuple[torch.Tensor, Tuple[int, int], torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]]):
     batched_data = []
 
     for data in batch:
@@ -139,35 +181,8 @@ def collate_fn(batch):
     return batched_data
 
 
-class ResizeAndPad:
-
-    def __init__(self, target_size):
-        self.target_size = target_size
-        self.transform = ResizeLongestSide(target_size)
-        self.to_tensor = transforms.ToTensor()
-
-    def __call__(self, image, masks, boxes, point_coords):
-        # Resize image and masks
-        og_h, og_w, _ = image.shape
-        image = self.transform.apply_image(image)
-        masks = [torch.tensor(self.transform.apply_image(mask)) for mask in masks]        
-        image = self.to_tensor(image)
-
-        # Resize masks to 1/4th resolution of the image 
-        resized_masks = []
-        for mask in masks:
-            # CAPITRE SE SERVE LA CONVERSIONE IN FLOAT
-            mask = F.max_pool2d(mask.unsqueeze(0).unsqueeze(0).float(), kernel_size=4, stride=4).squeeze()
-            resized_masks.append(mask)
-
-        # Adjust bounding boxes and point coordinates
-        boxes = self.transform.apply_boxes(boxes, (og_h, og_w))
-        point_coords = self.transform.apply_coords(point_coords, (og_h, og_w))
-
-        return image, resized_masks, boxes, point_coords
-
-
-def load_datasets(cfg, img_size):
+def load_datasets(cfg: Box, img_size: int) -> Tuple[DataLoader, DataLoader]:
+    # Definisci la trasformazione per il dataset
     transform = ResizeAndPad(img_size)
 
     # Ottiene il percorso del dataset

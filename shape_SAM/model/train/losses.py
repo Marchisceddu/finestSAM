@@ -1,19 +1,20 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
-from .config import cfg
 
+
+# Inserire dei commenti per capire cosa sono le variabili ALPHA e GAMMA
 ALPHA = 0.7
 GAMMA = 2
 
 
 class DiceLoss(nn.Module):
     
-    def __init__(self, weight=None, size_average=True):
+    def __init__(self, smooth: int = 1):
         super().__init__()
+        self.smooth = smooth
 
-    def forward(self, inputs, targets, num_masks, smooth=1):
+    def forward(self, inputs: torch.Tensor, targets: torch.Tensor, num_masks: int) -> torch.Tensor:
         """
         Compute the DICE loss, similar to generalized IOU for masks
         Args:
@@ -34,7 +35,7 @@ class DiceLoss(nn.Module):
 
         numerator = 2 * (inputs * targets).sum(1)
         denominator = inputs.sum(-1) + targets.sum(-1)
-        loss = 1 - (numerator + smooth) / (denominator + smooth)
+        loss = 1 - (numerator + self.smooth) / (denominator + self.smooth)
         
         return loss.sum() / num_masks
 
@@ -42,11 +43,12 @@ class DiceLoss(nn.Module):
 
 class FocalLoss(nn.Module):
 
-    def __init__(self, weight=None, size_average=True):
+    def __init__(self, alpha: float = ALPHA, gamma: int = GAMMA):
         super().__init__()
+        self.alpha = alpha
+        self.gamma = gamma
 
-    def forward(self, inputs, targets, num_masks, alpha=ALPHA, gamma=GAMMA):
-        
+    def forward(self, inputs: torch.Tensor, targets: torch.Tensor, num_masks: int) -> torch.Tensor:
         """
         Loss used in RetinaNet for dense detection: https://arxiv.org/abs/1708.02002.
         Args:
@@ -74,21 +76,21 @@ class FocalLoss(nn.Module):
 
         ce_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduction="none")
         p_t = prob * targets + (1 - prob) * (1 - targets)
-        loss = ce_loss * ((1 - p_t) ** gamma)
+        loss = ce_loss * ((1 - p_t) ** self.gamma)
 
-        if alpha >= 0:
-            alpha_t = alpha * targets + (1 - alpha) * (1 - targets)
+        if self.alpha >= 0:
+            alpha_t = self.alpha * targets + (1 - self.alpha) * (1 - targets)
             loss = alpha_t * loss
 
         return loss.mean(1).sum() / num_masks
     
 
-class Calc_iou(nn.Module):
+class IoULoss(nn.Module):
 
     def __init__(self):
         super().__init__()
 
-    def forward(self, pred_mask: torch.Tensor, gt_mask: torch.Tensor):
+    def forward(self, pred_mask: torch.Tensor, gt_mask: torch.Tensor) -> torch.Tensor:
          
         pred_mask = (pred_mask >= 0.5).float()
         pred_mask = pred_mask.squeeze()

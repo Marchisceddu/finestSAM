@@ -4,42 +4,34 @@ import torch
 import numpy as np
 import lightning as L
 import geopandas as gpd
-from shapely.geometry import Polygon
 import matplotlib.pyplot as plt
-from model.utils import (
+from box import Box
+from shapely.geometry import Polygon
+from .utils import (
     show_anns,
     show_mask,
     show_points,
     show_box
 )
-from model.model import shape_SAM
-from model.config import cfg
-from model.dataset import COCODataset
+from ..utils import set_model
+from ..model import shape_SAM
+from ..dataset import COCODataset
 
-def pred_auto(path):
+
+def automatic_predictions(cfg: Box, path: str):
     # Get the image
     main_directory = os.path.dirname(os.path.abspath(__file__))
     image_path = os.path.join(main_directory, path)
-
     image = cv2.imread(image_path)
 
     # Load the model 
-    fabric = L.Fabric(accelerator=cfg.device,
-                    devices=cfg.num_devices,
-                    strategy="auto")
-    fabric.launch()
-    fabric.seed_everything(cfg.seed_device) 
+    model, fabric = set_model(cfg, save_loggers=False)
 
-    with fabric.device:
-        model = shape_SAM(cfg)
-        model.setup()
-        model.to(fabric.device)
-
-    # Get the masks
+    # Predict the masks
     predictor = model.get_automatic_predictor(min_mask_region_area = 300)
     masks = predictor.generate(image)
 
-    # Show the image with the masks
+    # Show the image with the masks RISCRIVERLO BENE
     plt.figure(figsize=(8,8))
     plt.imshow(image)
     show_anns(masks, opacity=1)
@@ -73,7 +65,9 @@ def pred_auto(path):
     plt.savefig("./output.svg")
     plt.show()
 
-def pred_boxes():
+
+# Predittori manuali, da cambiare
+def pred_boxes(cfg: Box):
     main_directory = os.path.dirname(os.path.abspath(__file__))
 
     # Load the model 
@@ -137,7 +131,7 @@ def pred_boxes():
         #  Save the masks
 
 
-def pred_points():
+def pred_points(cfg: Box):
     main_directory = os.path.dirname(os.path.abspath(__file__))
 
     # Load the model 
@@ -229,8 +223,3 @@ def pred_points():
             plt.show()  
 
         #  Save the masks
-
-
-if __name__ == '__main__':
-    #pred_auto('../dataset/images/0.png')
-    pred_boxes()

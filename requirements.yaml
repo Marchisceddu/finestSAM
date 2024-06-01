@@ -1,0 +1,20 @@
+name: shape_SAM
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - geopandas
+  - lightning
+  - matplotlib
+  - numpy
+  - opencv
+  - pillow
+  - pycocotools
+  - python-box
+  - rasterio
+  - segmentation-models-pytorch
+  - shapely
+  - pytorch
+  - torchvision
+  - tqdm
+  - tensorboard

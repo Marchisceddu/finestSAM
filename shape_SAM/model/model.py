@@ -2,13 +2,15 @@ import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from box import Box
 from typing import Any, Dict, List
 from .segment_anything import sam_model_registry
 from .segment_anything import SamPredictor, SamAutomaticMaskGenerator
 
+
 class shape_SAM(nn.Module):
 
-    def __init__(self, cfg):
+    def __init__(self, cfg: Box):
         super().__init__()
         self.cfg = cfg
 
@@ -133,5 +135,9 @@ class shape_SAM(nn.Module):
     def get_predictor(self):
         return SamPredictor(self.model)
 
-    def get_automatic_predictor(self, min_mask_region_area = 0):
-        return SamAutomaticMaskGenerator(model = self.model, min_mask_region_area = min_mask_region_area)
+    def get_automatic_predictor(
+            self, 
+            min_mask_region_area: int = 0
+        ): # aggiungere altre paramentri per modificare
+        return SamAutomaticMaskGenerator(model=self.model, 
+                                         min_mask_region_area=min_mask_region_area)
