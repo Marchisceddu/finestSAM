@@ -19,9 +19,12 @@ from ..dataset import COCODataset
 
 
 def automatic_predictions(cfg: Box, path: str):
-    # Get the image
-    main_directory = os.path.dirname(os.path.abspath(__file__))
+    # Get the paths
+    main_directory = os.path.dirname(os.path.abspath(__file__)).rsplit('/', 2)[0]
+    cfg.out_dir = os.path.join(main_directory, cfg.out_dir)
     image_path = os.path.join(main_directory, path)
+
+    # Get the image
     image = cv2.imread(image_path)
 
     # Load the model 
@@ -54,7 +57,7 @@ def automatic_predictions(cfg: Box, path: str):
     gdf = gpd.GeoDataFrame(geometry=polygons)
 
     # Salva il GeoDataFrame in un file Shapefile
-    gdf.to_file("./output/output.shp")
+    gdf.to_file("./output/output.shp") # aggiustare questo percorso, bisogna assicurarsi che esiat la cartella e crearla in caso contrario
     
     #stesso procedimento ma salvando un file vettoriale svg per vedere meglio
     fig, ax = plt.subplots()

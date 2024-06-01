@@ -6,7 +6,7 @@ from typing import Tuple
 from lightning.fabric.loggers import TensorBoardLogger
 
 
-def set_model(cfg: Box, save_loggers: True) -> Tuple[shape_SAM, L.Fabric]:
+def set_model(cfg: Box, save_loggers: bool = True) -> Tuple[shape_SAM, L.Fabric]:
     """Set the device and the model."""
     loggers = [TensorBoardLogger(cfg.out_dir, name="loggers_shape_SAM")] if save_loggers else None
 
@@ -18,8 +18,8 @@ def set_model(cfg: Box, save_loggers: True) -> Tuple[shape_SAM, L.Fabric]:
 
     fabric.seed_everything(cfg.seed_device)
 
-    if save_loggers and fabric.global_rank == 0:
-        os.makedirs(cfg.out_dir, exist_ok=True)
+    if save_loggers and fabric.global_rank == 0: 
+        os.makedirs(os.path.join(cfg.out_dir, "loggers_shape_SAM"), exist_ok=True)
 
     with fabric.device:
         model = shape_SAM(cfg)

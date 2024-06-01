@@ -50,7 +50,4 @@ config = {
     }
 }
 
-#ATTENZIONE
-# train e val in dataset vanno eliminati in teoria e sostituiti con lo split del dataset in dataset.py
-
 cfg = Box(config)

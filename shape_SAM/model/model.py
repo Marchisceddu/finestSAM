@@ -15,8 +15,7 @@ class shape_SAM(nn.Module):
         self.cfg = cfg
 
     def setup(self):
-        current_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        checkpoint = os.path.join(current_directory, self.cfg.out_dir, self.cfg.model.checkpoint)
+        checkpoint = os.path.join(self.cfg.out_dir, self.cfg.model.checkpoint)
 
         self.model = sam_model_registry[self.cfg.model.type](checkpoint=checkpoint)
         self.model.train()

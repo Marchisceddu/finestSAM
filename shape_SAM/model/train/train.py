@@ -12,7 +12,7 @@ def train(cfg: Box):
     """Main training function."""
 
     # Set up the output directory
-    main_directory = os.path.dirname(os.path.abspath(__file__))
+    main_directory = os.path.dirname(os.path.abspath(__file__)).rsplit('/', 2)[0]
     cfg.out_dir = os.path.join(main_directory, cfg.out_dir)
 
     # Set up the model and device
