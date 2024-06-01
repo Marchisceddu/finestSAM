@@ -9,6 +9,6 @@ if __name__ == "__main__":
 
     switcher = {
         "train": train,
-        "predict": automatic_predictions
+        "predict": lambda cfg: automatic_predictions(cfg, "../dataset/images/0.png")
     }
     switcher[args.mode](cfg)

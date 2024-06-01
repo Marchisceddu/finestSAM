@@ -7,7 +7,7 @@ config = {
 
     "num_devices": "auto",
     "batch_size": 2,
-    "num_workers": 2,
+    "num_workers": 0,
     "out_dir": "sav",
 
     "train_type": "custom",
