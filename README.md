@@ -75,8 +75,8 @@ Per cambiare le impostazioni modificare il file [Shape_SAM/config.py](https://gi
 "seed_dataloader": int / None per random,
 
 "num_devices": int # Numero di dispositivi da utilizzare
-               (lista str) # definire queli GPU utilizzare
-                str = "auto",
+                or (lista str) # definire queli GPU utilizzare
+                or str = "auto",
 "batch_size": int, # Grandezza batch delle immagini
 "num_workers": int, # Quanti sottoprocessi utilizzare per il caricamento dei dati (0 -> i dati verranno caricati nel processo principale)
 "out_dir": str, # Cartella di output per i salvsataggi e di caricamento checkpoint
