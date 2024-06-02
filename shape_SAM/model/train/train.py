@@ -3,7 +3,7 @@ import lightning as L
 from .train_custom import train_custom
 from .train_11_iterations import train_11_iterations
 from .utils import configure_opt
-from ..dataset import load_datasets
+from ..dataset import load_dataset
 from ..utils import set_model
 from box import Box
 
@@ -18,8 +18,8 @@ def train(cfg: Box):
     # Set up the model and device
     model, fabric = set_model(cfg)
 
-    # Load the datasets
-    train_data, val_data = load_datasets(cfg, model.model.image_encoder.img_size)
+    # Load the dataset
+    train_data, val_data = load_dataset(cfg, model.model.image_encoder.img_size)
     train_data = fabric._setup_dataloader(train_data)
     val_data = fabric._setup_dataloader(val_data)
 

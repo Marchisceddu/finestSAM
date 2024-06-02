@@ -79,7 +79,7 @@ Per cambiare le impostazioni modificare il file [Shape_SAM/config.py](https://gi
                 or str = "auto",
 "batch_size": int, # Grandezza batch delle immagini
 "num_workers": int, # Quanti sottoprocessi utilizzare per il caricamento dei dati (0 -> i dati verranno caricati nel processo principale)
-"out_dir": str, # Cartella di output per i salvsataggi e di caricamento checkpoint
+"out_dir": str, # Cartella di output per i salvataggi e di caricamento checkpoint
 
 "train_type": str = "custom" or "11_iterations",
 "num_epochs": int, # Numero di epoche di train

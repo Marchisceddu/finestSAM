@@ -51,13 +51,14 @@ def save(
     model: shape_SAM, 
     out_dir: str,
     epoch: int,
+    iou: float,
 ):
     """Save the model checkpoint."""
 
     fabric.print(f"Saving checkpoint to {out_dir}")
     state_dict = model.model.state_dict()
     if fabric.global_rank == 0:
-        torch.save(state_dict, os.path.join(out_dir, f"epoch-{epoch:06d}-ckpt.pth"))
+        torch.save(state_dict, os.path.join(out_dir, f"epoch:{epoch:06d}-MeanIoU:{iou:06d}-ckpt.pth"))
 
 
 def validate(
@@ -102,5 +103,36 @@ def validate(
         )
 
     fabric.print(f'Validation [{epoch}]: Mean IoU: [{ious.avg:.4f}]')
-    save(fabric, model, cfg.out_dir, epoch)
+    save(fabric, model, cfg.out_dir, epoch, ious.avg)
     model.train()
+
+
+def print_and_log_metrics(
+    fabric: L.Fabric,
+    cfg: Box,
+    epoch: int,
+    iter: int,
+    batch_time: AverageMeter,
+    data_time: AverageMeter,
+    focal_losses: AverageMeter,
+    dice_losses: AverageMeter,
+    iou_losses: AverageMeter,
+    total_losses: AverageMeter,
+    best_score: float,
+    train_dataloader: DataLoader,
+):
+    fabric.print(f'Epoch: [{epoch}][{iter+1}/{len(train_dataloader)}]'
+                 f' | Time [{batch_time.val:.3f}s ({batch_time.avg:.3f}s)]'
+                 f' | Data [{data_time.val:.3f}s ({data_time.avg:.3f}s)]'
+                 f' | a Focal Loss [{cfg.opt.focal_ratio * focal_losses.val:.4f} ({cfg.opt.focal_ratio * focal_losses.avg:.4f})]'
+                 f' | Dice Loss [{cfg.opt.dice_ratio * dice_losses.val:.4f} ({cfg.opt.dice_ratio * dice_losses.avg:.4f})]'
+                 f' | IoU Loss [{iou_losses.val:.4f} ({iou_losses.avg:.4f})]'
+                 f' | Total Loss [{total_losses.val:.4f} ({total_losses.avg:.4f})]'
+                 f' | Mask quality [({best_score:.4f})]')
+    steps = epoch * len(train_dataloader) + iter
+    log_info = {
+        'Loss': total_losses.val,
+        'alpha focal loss': cfg.opt.focal_ratio * focal_losses.val,
+        'dice loss': cfg.opt.dice_ratio * dice_losses.val,
+    }
+    fabric.log_dict(log_info, step=steps)

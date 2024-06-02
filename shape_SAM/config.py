@@ -28,7 +28,10 @@ config = {
         "decay_factor": 10,
         "steps": [60000, 86666],
         "warmup_steps": 250,
-        "focal_alpha": 20.,
+        "focal_ratio": 20.,
+        "dice_ratio": 1.,
+        "focal_alpha": 0.75,
+        "focal_gamma": 2,
     },
 
     "model": {

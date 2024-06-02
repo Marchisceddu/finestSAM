@@ -6,7 +6,8 @@ import torch.nn.functional as F
 from .utils import (
     AverageMeter,
     validate,
-    save
+    save,
+    print_and_log_metrics
 )
 from .losses import (
     IoULoss,
@@ -34,7 +35,7 @@ def train_11_iterations(
     This function is used to train the model with 11 iterations as described in the paper.
     """
 
-    focal_loss = FocalLoss()
+    focal_loss = FocalLoss(alpha=cfg.opt.focal_alpha, gamma=cfg.opt.focal_gamma)
     dice_loss = DiceLoss()
     iou_loss = IoULoss()
 
@@ -136,22 +137,7 @@ def train_11_iterations(
                 total_losses.update(loss_total.item(), cfg.batch_size)
                 best_score = torch.mean(iou_prediction)
 
-                fabric.print(f'Epoch: [{epoch}][{iter+1}/{len(train_dataloader)}]'
-                            f'Iteration: [{iteration}]'
-                            f' | Time [{batch_time.val:.3f}s ({batch_time.avg:.3f}s)]'
-                            f' | Data [{data_time.val:.3f}s ({data_time.avg:.3f}s)]'
-                            f' | a Focal Loss [{focal_alpha * focal_losses.val:.4f} ({focal_alpha * focal_losses.avg:.4f})]'
-                            f' | Dice Loss [{dice_losses.val:.4f} ({dice_losses.avg:.4f})]'
-                            f' | IoU Loss [{iou_losses.val:.4f} ({iou_losses.avg:.4f})]'
-                            f' | Total Loss [{total_losses.val:.4f} ({total_losses.avg:.4f})]'
-                            f' | Mask quality [({best_score:.4f})]')
-                steps = epoch * len(train_dataloader) + iter
-                log_info = {
-                    'Loss': total_losses.val,
-                    'alpha focal loss': focal_alpha * focal_losses.val,
-                    'dice loss': dice_losses.val,
-                }
-                fabric.log_dict(log_info, step=steps)
+                print_and_log_metrics(fabric, cfg, epoch, iter, batch_time, data_time, focal_losses, dice_losses, iou_losses, total_losses, best_score, train_dataloader)
 
         if (epoch > 1 and cfg.eval_interval > 0 and epoch % cfg.eval_interval == 0) or (epoch == cfg.num_epochs):
             validate(fabric, cfg, model, val_dataloader, epoch)

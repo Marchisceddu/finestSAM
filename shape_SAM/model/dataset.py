@@ -63,19 +63,19 @@ class COCODataset(Dataset):
         for ann in anns:
             # Get the bounding box
             x, y, w, h = ann['bbox']
+
             # Add random noise to each coordinate with standard deviation equal to 10% of the box sidelength, to a maximum of 20 pixels
             x = max(0, int(x + np.random.normal(0, 0.1 * w)))
             y = max(0, int(y + np.random.normal(0, 0.1 * h)))
             w = min(W - x, int(w + np.random.normal(0, 0.1 * w)))
             h = min(H - y, int(h + np.random.normal(0, 0.1 * h)))
-
             boxes.append([x, y, x + w, y + h])
 
             # Get the mask
             mask = self.coco.annToMask(ann)
             masks.append(mask)
             
-            # Get the points
+            # Get the points for the mask
             list_point_0 = []
             list_point_1 = []
             for j in range(y, y + h):
@@ -114,6 +114,7 @@ class COCODataset(Dataset):
         point_coords = torch.tensor(np.stack(point_coords, axis=0))
         point_labels = torch.as_tensor(point_labels, dtype=torch.int)
 
+        # Add channel dimension to the masks for compatibility with the model
         resized_masks = resized_masks.unsqueeze(1)
         
         return image, original_size, point_coords, point_labels, boxes, masks, resized_masks
@@ -139,10 +140,9 @@ class ResizeAndPad:
         masks = [torch.tensor(self.transform.apply_image(mask)) for mask in masks]        
         image = self.to_tensor(image)
 
-        # Resize masks to 1/4th resolution of the image 
+        # Resize masks to 1/4th resolution of the image
         resized_masks = []
         for mask in masks:
-            # CAPITRE SE SERVE LA CONVERSIONE IN FLOAT
             mask = F.max_pool2d(mask.unsqueeze(0).unsqueeze(0).float(), kernel_size=4, stride=4).squeeze()
             resized_masks.append(mask)
 
@@ -181,11 +181,11 @@ def collate_fn(batch: List[Tuple[torch.Tensor, Tuple[int, int], torch.Tensor, to
     return batched_data
 
 
-def load_datasets(cfg: Box, img_size: int) -> Tuple[DataLoader, DataLoader]:
-    # Definisci la trasformazione per il dataset
+def load_dataset(cfg: Box, img_size: int) -> Tuple[DataLoader, DataLoader]:
+    # Set up the transformation for the dataset
     transform = ResizeAndPad(img_size)
 
-    # Ottiene il percorso del dataset
+    # Load the dataset
     main_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     dataset_path = os.path.join(main_directory, cfg.dataset.root_dir)
     annotations_path = os.path.join(main_directory, cfg.dataset.annotation_file)
@@ -195,11 +195,11 @@ def load_datasets(cfg: Box, img_size: int) -> Tuple[DataLoader, DataLoader]:
                         transform=transform,
                         seed=cfg.seed_dataloader)
     
-    # Calcola le dimensioni per i dataset di training e di validazione
+    # Calc the size of the validation set
     total_size = len(data)
     val_size = int(total_size * cfg.dataset.val_size)
 
-    # Dividi il dataset in training set e validation set
+    # Split the dataset into training and validation
     train_data, val_data = random_split(data, [total_size - val_size, val_size])
 
     train_dataloader = DataLoader(train_data,
