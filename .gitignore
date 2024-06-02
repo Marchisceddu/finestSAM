@@ -2,4 +2,4 @@
 *.py[co]
 
 create_dataset/shp/*
-shape_SAM/sav/*.pth
+finestSAM/sav/*.pth
