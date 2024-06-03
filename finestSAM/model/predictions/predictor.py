@@ -61,6 +61,8 @@ def automatic_predictions(
           points = [(int(point[0][0]), -int(point[0][1])) for point in approx]
           polygons.append(Polygon(points))
                   
+    # Se non esiste la cartella di output, la crea
+    os.makedirs(cfg.out_dir, exist_ok=True)
     
     # Salvataggio delle predizioni come file .shp
     gdf = gpd.GeoDataFrame(geometry=polygons)
