@@ -3,13 +3,19 @@ from box import Box
 config = {
     "device": "auto",
     "seed_device": 1337,
-    "seed_dataloader": None,
 
+    "model": {
+        "type": 'vit_h',
+        "checkpoint": "sam_vit_h_4b8939.pth",
+    },
+}
+
+config_train = {
+    "seed_dataloader": None,
     "num_devices": "auto",
     "batch_size": 2,
     "num_workers": 0,
     "sav_dir": "sav",
-    "out_dir": "out",
 
     "train_type": "custom",
     "num_epochs": 200,
@@ -39,9 +45,7 @@ config = {
         "focal_gamma": 2,
     },
 
-    "model": {
-        "type": 'vit_h',
-        "checkpoint": "sam_vit_h_4b8939.pth",
+    "model_layer": {
         "freeze": {
             "image_encoder": True,
             "prompt_encoder": True,
@@ -58,4 +62,12 @@ config = {
     }
 }
 
-cfg = Box(config)
+config_predict = {
+    "approx_accuracy": 0.01,
+}
+
+cfg_train = Box(config)
+cfg_train.update(Box(config_train))
+
+cfg_predict = Box(config)
+cfg_predict.update(Box(config_predict))

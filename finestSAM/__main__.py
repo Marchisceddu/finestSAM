@@ -1,5 +1,4 @@
 import argparse
-from config import cfg
 from model import train, automatic_predictions
 
 if __name__ == "__main__":
@@ -10,11 +9,15 @@ if __name__ == "__main__":
     args, unknown = parser.parse_known_args()
 
     if args.mode == 'predict':
+        from config import cfg_predict as cfg
+
         predict_parser = argparse.ArgumentParser()
         predict_parser.add_argument('--input', type=str, required=True, help='Path dell\'immagine da analizzare')
-        predict_parser.add_argument('--approx_accuracy', type=float, default=0.01, help='Accuratezza approssimativa dei poligoni')
+        predict_parser.add_argument('--approx_accuracy', type=float, default=cfg.approx_accuracy, help='Accuratezza approssimativa dei poligoni')
         predict_args = predict_parser.parse_args(unknown)
-    else:
+    elif args.mode == 'train':
+        from config import cfg_train as cfg
+
         predict_args = None
 
     # Execute the mode selected

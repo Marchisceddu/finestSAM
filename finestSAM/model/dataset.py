@@ -13,7 +13,7 @@ from torch.utils.data import (
     DataLoader,
     random_split
 )
-from config import cfg
+from config import cfg_train as cfg
 
 
 class COCODataset(Dataset):
