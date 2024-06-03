@@ -17,13 +17,13 @@ CONTINUARE LA DESCRIZIONE
     shp/
     ├── image01/
     │   ├── image01.shp
-    │   ├── ... # resto dei file che servono per il file shp (.cpg, .dbf, .prj, .shx)
+    │   ├── ... # Resto dei file che servono per il file shp (.cpg, .dbf, .prj, .shx)
     │   ├── img.tif
-    │   ├── img2.tif     # Ci possono essere più tif georeferenziate per ogni file shp
+    │   ├── img2.tif # Ci possono essere più tif georeferenziate per ogni file shp
     │   └── ...
     ├── image02/
     │   ├── image02.shp
-    │   ├── ... # resto dei file che servono per il file shp (.cpg, .dbf, .prj, .shx)
+    │   ├── ... # Resto dei file che servono per il file shp (.cpg, .dbf, .prj, .shx)
     │   ├── img.tif
     │   ├── img2.tif
     │   └── ...
@@ -79,11 +79,13 @@ Per cambiare le impostazioni modificare il file [Shape_SAM/config.py](https://gi
                 or str = "auto",
 "batch_size": int, # Grandezza batch delle immagini
 "num_workers": int, # Quanti sottoprocessi utilizzare per il caricamento dei dati (0 -> i dati verranno caricati nel processo principale)
-"out_dir": str, # Cartella di output per i salvataggi e di caricamento checkpoint
+"sav_dir": str, # Cartella di output per i salvataggi
+"out_dir": str, # Cartella di output per le predizioni
 
 "train_type": str = "custom" or "11_iterations",
 "num_epochs": int, # Numero di epoche di train
 "eval_interval": int, # Intervallo di validazione
+"eval_improvement": float (0-1), # Percentuale oltre il quale avviene il salvataggio
 "custom_cfg": {
     "use_boxes": bool, # Se True usa le boxe per il train
     "use_points": bool, # Se True usa i punti per il train
@@ -99,7 +101,13 @@ Per cambiare le impostazioni modificare il file [Shape_SAM/config.py](https://gi
     "decay_factor": int,
     "steps": [int, int],
     "warmup_steps": int,
-    "focal_alpha": float, # Peso di Focal loss sulla loss totale
+},
+
+"losses": {
+    "focal_ratio": float, # Peso di Focal loss sulla loss totale
+    "dice_ratio": float, # Peso di Dice loss sulla loss totale
+    "focal_alpha": float, # Valore di alpha per la Focal loss
+    "focal_gamma": int, # Valore di gamma per la Focal loss
 },
 
 "model": {
@@ -115,7 +123,7 @@ Per cambiare le impostazioni modificare il file [Shape_SAM/config.py](https://gi
 "dataset": {
     "root_dir": str, # Path per la cartella delle immagini del dataset
     "annotation_file": str, # Path per la cartella delle annotazioni del dataset
-    "val_size": float, # Percentuale grandezza validation dataset
+    "val_size": float (0-1), # Percentuale grandezza validation dataset
     "positive_points": int, # Numero punti positivi passati con __getitem__
     "negative_points": int, # Numero punti negativi passati con __getitem__
 }

@@ -56,6 +56,7 @@ def automatic_predictions(
     """
     # Get the paths
     main_directory = os.path.dirname(os.path.abspath(__file__)).rsplit('/', 2)[0]
+    cfg.sav_dir = os.path.join(main_directory, cfg.sav_dir)
     cfg.out_dir = os.path.join(main_directory, cfg.out_dir)
     image_path = os.path.join(main_directory, path)
 
