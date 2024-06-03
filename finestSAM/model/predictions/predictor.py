@@ -18,28 +18,6 @@ from ..utils import set_model
 from ..model import FinestSAM
 from ..dataset import COCODataset
 
-def show_anns_on_image(image, anns, opacity=0.35):
-    if len(anns) == 0:
-        return image
-    
-    sorted_anns = sorted(anns, key=(lambda x: x['area']), reverse=True)
-
-    # Converti l'immagine in un array RGBA (con canale alpha)
-    img_rgba = np.array(image.convert("RGBA"))
-
-    # Creiamo un array per l'immagine con le maschere sovrapposte
-    mask_img = np.zeros_like(img_rgba, dtype=np.uint8)
-
-    for ann in sorted_anns:
-        m = ann['segmentation']
-        color_mask = np.concatenate([np.random.randint(0, 255, 3), [int(opacity * 255)]])
-        mask_img[m] = color_mask
-
-    # Combina l'immagine originale con le maschere
-    combined_img = Image.alpha_composite(Image.fromarray(img_rgba), Image.fromarray(mask_img))
-
-    return combined_img
-
 
 def automatic_predictions(
         cfg: Box, 
@@ -70,7 +48,7 @@ def automatic_predictions(
     predictor = model.get_automatic_predictor(min_mask_region_area = 300)
     masks = predictor.generate(image)
 
-    # Show the image with the masks RISCRIVERLO BENE
+    # Show the image with the masks
     polygons = []
     for i, mask in enumerate(masks):
         mask = mask["segmentation"].astype(np.uint8)
@@ -84,26 +62,25 @@ def automatic_predictions(
           polygons.append(Polygon(points))
                   
     
-    # Crea un GeoDataFrame utilizzando i poligoni Shapely
+    # Salvataggio delle predizioni come file .shp
     gdf = gpd.GeoDataFrame(geometry=polygons)
-
-    # Salva il GeoDataFrame in un file Shapefile
     gdf.to_file(os.path.join(cfg.out_dir, "output.shp"))
 
-    image = Image.fromarray(image)  # Converti l'array numpy a un oggetto PIL.Image
-    combined_image = show_anns_on_image(image, masks, opacity=0.35)
+    # Salvataggio delle predizioni come file .png
+    plt.imshow(image)
+    show_anns(masks, opacity=0.8)
+    plt.axis('off')
+    plt.savefig(os.path.join(cfg.out_dir, "output.png"))
+    plt.clf()
 
-    # Salva l'immagine combinata come file PNG
-    combined_image.save('./output.png')
-    
-    # fig, ax = plt.subplots()
-    # gdf.boundary.plot(ax=ax)
-    # ax.set_aspect('equal')
-    # ax.axis('off')
-    # ax.set_xticks([])
-    # plt.savefig("./output.svg")
-    # plt.show()
-
+    # Salvataggio delle predizioni come file .svg
+    fig, ax = plt.subplots()
+    gdf.boundary.plot(ax=ax)
+    ax.set_aspect('equal')
+    ax.axis('off')
+    ax.set_xticks([])
+    plt.savefig(os.path.join(cfg.out_dir, "output.svg"))
+    plt.clf()
 
 # Predittori manuali, da cambiare
 def pred_boxes(cfg: Box):
