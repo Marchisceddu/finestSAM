@@ -2,7 +2,10 @@ from box import Box
 
 config = {
     "device": "auto",
+    "num_devices": "auto",
     "seed_device": 1337,
+    "sav_dir": "sav",
+    "out_dir": "out",
 
     "model": {
         "type": 'vit_h',
@@ -12,10 +15,8 @@ config = {
 
 config_train = {
     "seed_dataloader": None,
-    "num_devices": "auto",
     "batch_size": 2,
     "num_workers": 0,
-    "sav_dir": "sav",
 
     "train_type": "custom",
     "num_epochs": 200,

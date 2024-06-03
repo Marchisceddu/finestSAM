@@ -4,3 +4,4 @@
 
 create_dataset/shp/*
 finestSAM/sav/*.pth
+finestSAM/out/*

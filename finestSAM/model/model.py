@@ -14,10 +14,14 @@ class FinestSAM(nn.Module):
         super().__init__()
         self.cfg = cfg
 
-    def setup(self):
+    def set_sam(self):
         checkpoint = os.path.join(self.cfg.sav_dir, self.cfg.model.checkpoint)
 
         self.model = sam_model_registry[self.cfg.model.type](checkpoint=checkpoint)
+
+    def setup(self):
+        self.set_sam()
+
         self.model.train()
         if self.cfg.model.freeze.image_encoder:
             for param in self.model.image_encoder.parameters():
@@ -27,8 +31,11 @@ class FinestSAM(nn.Module):
                 param.requires_grad = False
         if self.cfg.model.freeze.mask_decoder:
             for param in self.model.mask_decoder.parameters():
-                param.requires_grad = False
-
+                param.requires_grad = False     
+    
+    @torch.no_grad()
+    def setup(self):
+        self.set_sam()
 
     def forward(
         self,

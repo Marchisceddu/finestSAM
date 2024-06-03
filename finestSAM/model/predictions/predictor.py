@@ -42,11 +42,12 @@ def automatic_predictions(
     image = cv2.imread(image_path)
 
     # Load the model 
-    model, fabric = set_model(cfg, save_loggers=False)
+    with torch.no_grad():
+        model, fabric = set_model(cfg, save_loggers=False)
 
-    # Predict the masks
-    predictor = model.get_automatic_predictor(min_mask_region_area = 300)
-    masks = predictor.generate(image)
+        # Predict the masks
+        predictor = model.get_automatic_predictor(min_mask_region_area = 300)
+        masks = predictor.generate(image)
 
     # Show the image with the masks
     polygons = []
@@ -60,10 +61,10 @@ def automatic_predictions(
           approx = cv2.approxPolyDP(contour, epsilon, True)
           points = [(int(point[0][0]), -int(point[0][1])) for point in approx]
           polygons.append(Polygon(points))
-                  
+           
     # Se non esiste la cartella di output, la crea
     os.makedirs(cfg.out_dir, exist_ok=True)
-    
+
     # Salvataggio delle predizioni come file .shp
     gdf = gpd.GeoDataFrame(geometry=polygons)
     gdf.to_file(os.path.join(cfg.out_dir, "output.shp"))
@@ -83,6 +84,8 @@ def automatic_predictions(
     ax.set_xticks([])
     plt.savefig(os.path.join(cfg.out_dir, "output.svg"))
     plt.clf()
+
+    print("Predizioni Salvate")
 
 # Predittori manuali, da cambiare
 def pred_boxes(cfg: Box):

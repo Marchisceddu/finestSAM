@@ -5,7 +5,6 @@ if __name__ == "__main__":
     # Parse the arguments
     parser = argparse.ArgumentParser(description="Modello finestSAM, permette di effettuare un fine-tuning (--mode train) o di effettuare predizioni (--mode predict)")
     parser.add_argument('--mode', choices=['train', 'predict'], required=True, help='Modalità di esecuzione: train o predict')
-
     args, unknown = parser.parse_known_args()
 
     if args.mode == 'predict':
@@ -23,6 +22,6 @@ if __name__ == "__main__":
     # Execute the mode selected
     switcher = {
         "train": train,
-        "predict": lambda cfg: automatic_predictions(cfg, args.path, args.approx_accuracy)
+        "predict": lambda cfg: automatic_predictions(cfg, predict_args.input, predict_args.approx_accuracy)
     }
     switcher[args.mode](cfg)
