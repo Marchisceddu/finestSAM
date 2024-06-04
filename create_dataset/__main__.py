@@ -2,7 +2,6 @@ import os
 import argparse
 from tqdm import tqdm
 from dataset_functions import (
-    get_folder_path,
     crete_binary_mask, 
     create_annotation_COCO,
     display_COCO
@@ -10,11 +9,11 @@ from dataset_functions import (
 
 
 ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
-INPUT_PATH = os.path.join(ROOT_PATH, "shp/")
-DATASET_PATH = os.path.join(ROOT_PATH, "../dataset/")
-IMAGES_PATH = os.path.join(ROOT_PATH, "../dataset/images/")
-MASKS_PATH = os.path.join(ROOT_PATH, "../dataset/masks/")
-MASKS_TIF_PATH = os.path.join(ROOT_PATH, "binary_mask/")
+INPUT_PATH = os.path.join(ROOT_PATH, "shp")
+DATASET_PATH = os.path.join(ROOT_PATH, "../dataset")
+IMAGES_PATH = os.path.join(ROOT_PATH, "../dataset/images")
+MASKS_PATH = os.path.join(ROOT_PATH, "../dataset/masks")
+MASKS_TIF_PATH = os.path.join(ROOT_PATH, "binary_mask")
 JSON_PATH = os.path.join(ROOT_PATH, "../dataset/annotations.json")
 
 
@@ -31,7 +30,7 @@ def create_dataset(scegli_input = False, mostra_output = False):
 
     if (scegli_input):
         print("Seleziona la cartella di input:")
-        input_path = get_folder_path()
+        #input_path = get_folder_path()
     else:
         input_path = INPUT_PATH
 

@@ -19,7 +19,7 @@ if __name__ == "__main__":
 
         predict_args = None
 
-    # Execute the mode selected
+    # Execute the selected mode 
     switcher = {
         "train": train,
         "predict": lambda cfg: automatic_predictions(cfg, predict_args.input, predict_args.approx_accuracy)

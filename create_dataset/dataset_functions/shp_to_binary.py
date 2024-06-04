@@ -11,9 +11,9 @@ from tqdm import tqdm
 
 # Define the paths
 ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
-ORIGIN_IMG_PATH = os.path.join(ROOT_PATH, "../../dataset/images/")
-OUT_TIF_PATH = os.path.join(ROOT_PATH, "../binary_mask/")
-OUT_PNG_PATH = os.path.join(ROOT_PATH, "../../dataset/masks/shape/")
+ORIGIN_IMG_PATH = os.path.join(ROOT_PATH, "../../dataset/images")
+OUT_TIF_PATH = os.path.join(ROOT_PATH, "../binary_mask")
+OUT_PNG_PATH = os.path.join(ROOT_PATH, "../../dataset/masks/shape")
 
 
 def shp_plot(shapefile_path):
@@ -128,6 +128,9 @@ def shp_to_bm(tif_file_path, shp_file_path, output_folder):
     # Read the shapefile
     gdf = gpd.read_file(shp_file_path)
 
+    # Create the output folder if it does not exist
+    os.makedirs(f"{output_folder}", exist_ok = True)
+
     # Use rasterio to read the TIF file
     with rasterio.open(tif_file_path) as src:
         profile = src.profile
@@ -145,7 +148,7 @@ def shp_to_bm(tif_file_path, shp_file_path, output_folder):
         try:
             if geom.geom_type == 'Polygon':
                 # Check if the shape intersects the TIF bounds
-                if geom.intersects(tif_bounds):
+                #if geom.intersects(tif_bounds):
                     # Create a mask with the same shape as the TIF data
                     mask = np.zeros_like(data, dtype=np.uint8)
 
@@ -161,9 +164,6 @@ def shp_to_bm(tif_file_path, shp_file_path, output_folder):
                         all_touched = True,
                         default_value = 0
                     )
-
-                    # Create the output folder if it does not exist
-                    os.makedirs(f"{output_folder}", exist_ok = True)
 
                     # Set the output path for the binary mask
                     output_tif_path = f"{output_folder}/output_mask_{idx}.tif"
