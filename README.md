@@ -69,18 +69,27 @@ Per cambiare le impostazioni modificare il file [Shape_SAM/config.py](https://gi
 <summary> Struttura: </summary>
 <br>
 
+Generali:
 ```python
 "device": str = "auto" or "gpu" or "cpu", # Hardware su cui eseguire il modello (non è supportata mps, se si usa un mac m1 impostare su cpu)
-"seed_device": int / None per random,
-"seed_dataloader": int / None per random,
-
 "num_devices": int # Numero di dispositivi da utilizzare
+"seed_device": int / None per random,
+"sav_dir": str, # Cartella di output per i salvataggi
+"out_dir": str, # Cartella di output per le predizioni
+
+"model": {
+    "type": str = "vit_h" or "vit_l" or "vit_b",
+    "checkpoint": str, # Nome checkpoint, formato -> nome.pth
+},
+```
+
+Train:
+```python
+"seed_dataloader": int / None per random,
                 or (list str) # definire queli GPU utilizzare
                 or str = "auto",
 "batch_size": int, # Grandezza batch delle immagini
 "num_workers": int, # Quanti sottoprocessi utilizzare per il caricamento dei dati (0 -> i dati verranno caricati nel processo principale)
-"sav_dir": str, # Cartella di output per i salvataggi
-"out_dir": str, # Cartella di output per le predizioni
 
 "train_type": str = "custom" or "11_iterations",
 "num_epochs": int, # Numero di epoche di train
@@ -110,9 +119,7 @@ Per cambiare le impostazioni modificare il file [Shape_SAM/config.py](https://gi
     "focal_gamma": int, # Valore di gamma per la Focal loss
 },
 
-"model": {
-    "type": str = "vit_h" or "vit_l" or "vit_b",
-    "checkpoint": str, # Nome checkpoint formato -> nome.pth
+"model_layer": {
     "freeze": {
         "image_encoder": bool, # Se True freez del livello
         "prompt_encoder": bool, # Se True freez del livello
@@ -127,6 +134,11 @@ Per cambiare le impostazioni modificare il file [Shape_SAM/config.py](https://gi
     "positive_points": int, # Numero punti positivi passati con __getitem__
     "negative_points": int, # Numero punti negativi passati con __getitem__
 }
+```
+
+Predizioni:
+```python
+"approx_accuracy": float, # The approximation accuracy of the polygons
 ```
 
 </details>
@@ -150,10 +162,14 @@ Args (obbligatori):
 ### Predizioni automatiche:
 
 ```python
---mode "predict"
+--mode "predict" --input "percorso/image.png"
 ```
 
-Inserire un modo per poter far scegliere l'immgaine da predirre, per adesso bisongna cambiare il percorso nel file [shape_SAM/__main__.py](https://github.com/Marchisceddu/Progetto_Urbismap/blob/main/shape_SAM/__main__.py) 
+* Args (opzionali - modificabili anche in config):
+
+    ```python
+    --approx_accuracy (float) default:0.01 # The approximation accuracy of the polygons
+    ```
 
 ### Predizioni manuali:
 

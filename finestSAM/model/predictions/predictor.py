@@ -43,7 +43,7 @@ def automatic_predictions(
 
     # Load the model 
     with torch.no_grad():
-        model, fabric = set_model(cfg, save_loggers=False)
+        model, _ = set_model(cfg)
 
         # Predict the masks
         predictor = model.get_automatic_predictor(min_mask_region_area = 300)
@@ -51,7 +51,7 @@ def automatic_predictions(
 
     # Show the image with the masks
     polygons = []
-    for i, mask in enumerate(masks):
+    for mask in masks:
         mask = mask["segmentation"].astype(np.uint8)
 
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_TC89_L1)
@@ -86,6 +86,7 @@ def automatic_predictions(
     plt.clf()
 
     print("Predizioni Salvate")
+
 
 # Predittori manuali, da cambiare
 def pred_boxes(cfg: Box):

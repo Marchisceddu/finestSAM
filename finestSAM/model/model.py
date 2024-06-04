@@ -14,28 +14,21 @@ class FinestSAM(nn.Module):
         super().__init__()
         self.cfg = cfg
 
-    def set_sam(self):
+    def setup(self):
         checkpoint = os.path.join(self.cfg.sav_dir, self.cfg.model.checkpoint)
 
         self.model = sam_model_registry[self.cfg.model.type](checkpoint=checkpoint)
 
-    def setup(self):
-        self.set_sam()
-
-        self.model.train()
-        if self.cfg.model.freeze.image_encoder:
-            for param in self.model.image_encoder.parameters():
-                param.requires_grad = False
-        if self.cfg.model.freeze.prompt_encoder:
-            for param in self.model.prompt_encoder.parameters():
-                param.requires_grad = False
-        if self.cfg.model.freeze.mask_decoder:
-            for param in self.model.mask_decoder.parameters():
-                param.requires_grad = False     
-    
-    @torch.no_grad()
-    def setup(self):
-        self.set_sam()
+        if torch.is_grad_enabled():
+            if self.cfg.model_layer.freeze.image_encoder:
+                for param in self.model.image_encoder.parameters():
+                    param.requires_grad = False
+            if self.cfg.model_layer.freeze.prompt_encoder:
+                for param in self.model.prompt_encoder.parameters():
+                    param.requires_grad = False
+            if self.cfg.model_layer.freeze.mask_decoder:
+                for param in self.model.mask_decoder.parameters():
+                    param.requires_grad = False
 
     def forward(
         self,
@@ -130,7 +123,6 @@ class FinestSAM(nn.Module):
     
     def preprocess(self, x: torch.Tensor) -> torch.Tensor:
         """Pad to a square input."""
-        # Pad
         h, w = x.shape[-2:]
         img_size = max(h, w) 
         padh = img_size - h

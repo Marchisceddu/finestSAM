@@ -15,7 +15,7 @@ config = {
 
 config_train = {
     "seed_dataloader": None,
-    "batch_size": 2,
+    "batch_size": 1,
     "num_workers": 0,
 
     "train_type": "custom",
@@ -55,8 +55,8 @@ config_train = {
     },
 
     "dataset": {
-        "root_dir": "../dataset3/images",
-        "annotation_file": "../dataset3/annotations.json",
+        "root_dir": "../dataset/images",
+        "annotation_file": "../dataset/annotations.json",
         "val_size": 0,
         "positive_points": 4,
         "negative_points": 4,

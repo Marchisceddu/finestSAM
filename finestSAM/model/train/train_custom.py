@@ -5,7 +5,8 @@ import torch.nn.functional as F
 from .utils import (
     AverageMeter,
     validate,
-    print_and_log_metrics
+    print_and_log_metrics,
+    save
 )
 from .losses import (
     IoULoss,
@@ -33,6 +34,7 @@ def train_custom(
     focal_loss = FocalLoss(alpha=cfg.losses.focal_alpha, gamma=cfg.losses.focal_gamma)
     dice_loss = DiceLoss()
     iou_loss = IoULoss()
+    last_score = 0.
 
     for epoch in range(1, cfg.num_epochs + 1):
         # Initialize the meters
@@ -104,4 +106,5 @@ def train_custom(
 
         # Validate the model
         if (epoch > 1 and cfg.eval_interval > 0 and epoch % cfg.eval_interval == 0) or (epoch == cfg.num_epochs):
-            last_score = validate(fabric, cfg, model, val_dataloader, epoch)
+            last_score = validate(fabric, cfg, model, val_dataloader, epoch, last_score)
+            #save(fabric, model, cfg.sav_dir, "c")
