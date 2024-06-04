@@ -55,8 +55,7 @@ import glob
 import json
 import os
 import cv2
-import matplotlib.pyplot as plt
-from tqdm import tqdm
+import tqdm
 
 
 # Label IDs of the dataset representing different categories
@@ -68,10 +67,6 @@ MASK_EXT = 'png'
 ORIGINAL_EXT = 'png'
 image_id = 0
 annotation_id = 0
-
-ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
-MASKS_PATH = os.path.join(ROOT_PATH, "../../dataset/masks/")
-JSON_PATH =  os.path.join(ROOT_PATH, "../../dataset/annotations.json")
 
 
 def images_annotations_info(maskpath):
@@ -93,7 +88,8 @@ def images_annotations_info(maskpath):
         
         # Ottieni una lista dei nomi delle cartelle all'interno del percorso della categoria corrente
         category_folders = [folder for folder in os.listdir(category_path) if os.path.isdir(os.path.join(category_path, folder))]
-        bar_images = tqdm(total = len(category_folders), desc = "Creating COCO annotations...", position = 0, leave = False)
+
+        bar = tqdm.tqdm(total = len(category_folders), desc = f"Processing {category} masks", leave=False)
 
         for image_folder in category_folders:
             original_file_name = f'{os.path.basename(image_folder)}.{ORIGINAL_EXT}'
@@ -102,11 +98,8 @@ def images_annotations_info(maskpath):
             all_contours = []
             height, width = 0, 0
 
-            bar_image = tqdm(total = len(glob.glob(os.path.join(category_path, image_folder, f'*.{MASK_EXT}'))), desc = f"Image processing... {image_folder}", position = 1, leave = False)
-
             for mask_image in glob.glob(os.path.join(category_path, image_folder, f'*.{MASK_EXT}')):
-                bar_image.update(1)
-    
+
                 mask_image_open = cv2.imread(mask_image)
                 
                 # Get image dimensions
@@ -153,13 +146,13 @@ def images_annotations_info(maskpath):
                 if area > 0:
                     annotations.append(annotation)
                     annotation_id += 1
-            
-            bar_images.update(1)
 
+            bar.update(1)
+            
     return images, annotations, annotation_id
 
 
-def create_annotation_COCO(mask_path = MASKS_PATH, dest_json = JSON_PATH):
+def create_annotation_COCO(mask_path, dest_json):
     global image_id, annotation_id
     image_id = 0
     annotation_id = 0
@@ -188,6 +181,6 @@ def create_annotation_COCO(mask_path = MASKS_PATH, dest_json = JSON_PATH):
 if __name__ == "__main__":
     # esempio di utilizzo
     # il percorso deve partire dalla cartella dove si trova il file .py
-    train_mask_path = os.path.join(ROOT_PATH, "../../dataset/masks/")
-    train_json_path = os.path.join(ROOT_PATH, "../../dataset/annotations.json")
+    train_mask_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../dataset/masks/")
+    train_json_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../dataset/annotations.json")
     create_annotation_COCO(train_mask_path, train_json_path)
