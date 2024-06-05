@@ -28,13 +28,9 @@ def train(cfg: Box):
     model, optimizer = fabric.setup(model, optimizer)
 
     # Train the model based on the training type
-    # if cfg.train_type == "custom":
-    #     train_custom(cfg, fabric, model, optimizer, scheduler, train_data, val_data)
-    # elif cfg.train_type == "11-iteration":
-    #     train_11_iterations(cfg, fabric, model, optimizer, scheduler, train_data, val_data)
-    # else:
-    #     raise ValueError(f"Unknown training type: {cfg.train_type}")
-
-    for data in train_data:
-        print("----------")
-        continue
+    if cfg.train_type == "custom":
+        train_custom(cfg, fabric, model, optimizer, scheduler, train_data, val_data)
+    elif cfg.train_type == "11-iteration":
+        train_11_iterations(cfg, fabric, model, optimizer, scheduler, train_data, val_data)
+    else:
+        raise ValueError(f"Unknown training type: {cfg.train_type}")

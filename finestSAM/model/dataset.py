@@ -95,20 +95,6 @@ class COCODataset(Dataset):
                 boxes.append([x, y, x + w, y + h])
 
                 temp_list_point = []
-                
-                if len(list_point_1) == 0 or len(list_point_1) < 4:
-                    print("Image ID: ", ann['image_id'])
-                    color = (255, 0, 0)
-                    i = image.copy()
-                    x, y, x2, y2 = [x, y, x + w, y + h]
-                    cv2.rectangle(i, (x, y), (x2, y2), color, 2)
-                    for p in list_point_1:
-                        x, y = p
-                        cv2.circle(i, (x, y), 2, (0, 255, 0), -1)
-                    cv2.imshow('Bounding Boxes', i)
-                    cv2.waitKey(0)
-                    cv2.destroyAllWindows()
-
                 for i in range(0, cfg.dataset.positive_points):
                     idx = np.random.randint(0, len(list_point_1))
                     temp_list_point.append(list_point_1[idx])
