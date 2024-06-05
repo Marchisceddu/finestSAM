@@ -87,10 +87,17 @@ class COCODataset(Dataset):
                             list_point_0.append([i, j])
 
             temp_list_point = []
+            
+            if len(list_point_1) == 0 or len(list_point_1) < cfg.dataset.positive_points:
+                print(ann["area"])
+                print(list_point_1)
+                print(ann["image_id"])
+
             for i in range(0, cfg.dataset.positive_points):
                 idx = np.random.randint(0, len(list_point_1))
                 temp_list_point.append(list_point_1[idx])
             list_point_1 = temp_list_point.copy()
+        
 
             temp_list_point = []
             for i in range(0, cfg.dataset.negative_points):

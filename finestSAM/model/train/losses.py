@@ -143,19 +143,25 @@ class IoULoss(nn.Module):
                     The predictions for each example.
             gt_mask: A float tensor with the same shape as inputs. Stores the binary
                     classification label for each element in inputs
-                    (0 for the negative class and 1 for the positive class). CONTROLLARE QUESTI COMMENTI
+                    (0 for the negative class and 1 for the positive class).
         """
          
         pred_mask = (pred_mask >= 0.5).float()
-        pred_mask = pred_mask.squeeze()
-        gt_mask = gt_mask.squeeze()
-        
-        pred_mask = pred_mask.flatten(1)
-        gt_mask = gt_mask.flatten(1)
-            
-        intersection = (pred_mask * gt_mask).sum(1)
-        union = pred_mask.sum(1) + gt_mask.sum(1) - intersection
+        intersection = torch.sum(torch.mul(pred_mask, gt_mask), dim=(1, 2))
+        union = torch.sum(pred_mask, dim=(1,2)) + torch.sum(gt_mask, dim=(1, 2)) - intersection
         epsilon = 1e-7
         batch_iou = intersection / (union + epsilon)
+
+        # pred_mask = (pred_mask >= 0.5).float()
+        # pred_mask = pred_mask.squeeze()
+        # gt_mask = gt_mask.squeeze()
+        
+        # pred_mask = pred_mask.flatten(1)
+        # gt_mask = gt_mask.flatten(1)
+            
+        # intersection = (pred_mask * gt_mask).sum(1)
+        # union = pred_mask.sum(1) + gt_mask.sum(1) - intersection
+        # epsilon = 1e-7
+        # batch_iou = intersection / (union + epsilon)
 
         return batch_iou

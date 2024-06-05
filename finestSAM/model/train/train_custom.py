@@ -75,13 +75,14 @@ def train_custom(
 
                 iou_prediction_means = [torch.mean(score) for score in separated_scores]
                 best_index = torch.argmax(torch.tensor(iou_prediction_means))
-
                 pred_masks = separated_masks[best_index]
                 iou_prediction = separated_scores[best_index]
 
                 batch_iou = iou_loss(pred_masks, data["gt_masks"])
                 loss_focal += focal_loss(pred_masks, data["gt_masks"], num_masks)
                 loss_dice += dice_loss(pred_masks, data["gt_masks"], num_masks)
+
+                print(batch_iou)
                 loss_iou += F.mse_loss(iou_prediction, batch_iou, reduction='mean')
 
             loss_total = cfg.losses.focal_ratio * loss_focal + cfg.losses.dice_ratio * loss_dice + loss_iou

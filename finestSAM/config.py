@@ -15,12 +15,12 @@ config = {
 
 config_train = {
     "seed_dataloader": None,
-    "batch_size": 1,
+    "batch_size": 2,
     "num_workers": 0,
 
     "train_type": "custom",
-    "num_epochs": 200,
-    "eval_interval": 2,
+    "num_epochs": 100,
+    "eval_interval": 4,
     "eval_improvement": 0.05,
     "custom_cfg": {
         "use_boxes": True,
@@ -57,7 +57,7 @@ config_train = {
     "dataset": {
         "root_dir": "../dataset/images",
         "annotation_file": "../dataset/annotations.json",
-        "val_size": 0,
+        "val_size": 0.2,
         "positive_points": 4,
         "negative_points": 4,
     }

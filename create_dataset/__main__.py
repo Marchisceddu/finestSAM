@@ -7,7 +7,6 @@ from macro import INPUT_PATH, OUTPUT_PATH
 def create_dataset():
     '''
     Create a dataset from SHP and TIF files in COCO format
-
     '''
 
     # Delete the dataset folder if it already exists
@@ -25,7 +24,7 @@ def create_dataset():
         bar.update(1)
 
     # Delete the temp_masks folder
-    os.system(f"rm -r {os.path.join(OUTPUT_PATH, "temp_masks")}")
+    os.system(f"rm -r {os.path.join(OUTPUT_PATH, 'temp_masks')}")
 
     # Create the COCO annotation file
     create_annotation_COCO(os.path.join(OUTPUT_PATH, "masks"), os.path.join(OUTPUT_PATH, "annotations.json"))
