@@ -1,7 +1,7 @@
 from box import Box
 
 config = {
-    "device": "auto",
+    "device": "cpu",
     "num_devices": "auto",
     "seed_device": 1337,
     "sav_dir": "sav",
