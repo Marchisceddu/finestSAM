@@ -47,6 +47,7 @@ class COCODataset(Dataset):
         image_path = os.path.join(self.root_dir, image_info['file_name'])
         image = cv2.imread(image_path)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        imo = image.copy()
 
         # Get original size of the image
         H, W, _ = image.shape
@@ -70,6 +71,16 @@ class COCODataset(Dataset):
             w = min(W - x, int(w + np.random.normal(0, 0.1 * w)))
             h = min(H - y, int(h + np.random.normal(0, 0.1 * h)))
 
+            # check if the new box is contained in the image 
+            if x + w > W:
+                w = W - x
+            if y + h > H:
+                h = H - y
+            if x < 0:
+                x = 0
+            if y < 0:
+                y = 0
+
             # Get the mask
             mask = self.coco.annToMask(ann)
             
@@ -90,7 +101,7 @@ class COCODataset(Dataset):
             So, we need to filter out those annotations and keep only the ones that at least
             have the points that are needed for the training.  
             """
-            if len(list_point_1) > cfg.dataset.positive_points: 
+            if len(list_point_1) > cfg.dataset.positive_points and len(list_point_0) > cfg.dataset.negative_points: 
                 masks.append(mask)
                 boxes.append([x, y, x + w, y + h])
 
@@ -126,7 +137,7 @@ class COCODataset(Dataset):
         # Add channel dimension to the masks for compatibility with the model
         resized_masks = resized_masks.unsqueeze(1)
         
-        return image, original_size, point_coords, point_labels, boxes, masks, resized_masks
+        return image, original_size, point_coords, point_labels, boxes, masks, resized_masks, imo
     
 
 class ResizeAndPad:
@@ -162,11 +173,11 @@ class ResizeAndPad:
         return image, resized_masks, boxes, point_coords
 
 
-def collate_fn(batch: List[Tuple[torch.Tensor, Tuple[int, int], torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]]):
+def collate_fn(batch: List[Tuple[torch.Tensor, Tuple[int, int], torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]]):
     batched_data = []
 
     for data in batch:
-        image, original_size, point_coord, point_label, boxes, masks, resized_masks = data
+        image, original_size, point_coord, point_label, boxes, masks, resized_masks, imo = data
 
         if cfg.train_type == "custom":
             if not cfg.custom_cfg.use_boxes:
@@ -185,6 +196,7 @@ def collate_fn(batch: List[Tuple[torch.Tensor, Tuple[int, int], torch.Tensor, to
             "boxes": boxes,
             "mask_inputs": resized_masks,
             "gt_masks": masks,
+            "imo": imo,
         })
 
     return batched_data

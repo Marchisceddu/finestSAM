@@ -55,7 +55,7 @@ def save(
     """Save the model checkpoint."""
 
     fabric.print(f"Saving checkpoint to {out_dir}")
-    name = os.path.join(name, ".pth")
+    name = name + ".pth"
     state_dict = model.model.state_dict()
     if fabric.global_rank == 0:
         torch.save(state_dict, os.path.join(out_dir, name))
@@ -81,7 +81,7 @@ def validate(
 
             pred_masks = []
             for data in batched_data:
-                predictor.set_image(data["image"])
+                predictor.set_image(data["imo"])
                 masks, _, _ = predictor.predict_torch(
                     point_coords=data["point_coords"],
                     point_labels=data["point_labels"],
@@ -94,7 +94,7 @@ def validate(
             num_images = len(batched_data)
             for pred_mask, gt_mask in zip(pred_masks, gt_masks):
                 batch_stats = smp.metrics.get_stats(
-                    pred_mask,
+                    pred_mask.squeeze(1),
                     gt_mask.int(),
                     mode='binary',
                     threshold=0.5,
@@ -110,7 +110,7 @@ def validate(
 
         if ious.avg > last_score + (cfg.eval_improvement * last_score):
             last_score = ious.avg
-            save(fabric, model, cfg.sav_dir, "best.pth")
+            save(fabric, model, cfg.sav_dir, "best")
 
     model.train()
 
