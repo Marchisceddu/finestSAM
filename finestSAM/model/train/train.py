@@ -1,5 +1,4 @@
 import os
-import lightning as L
 from .train_custom import train_custom
 from .train_11_iterations import train_11_iterations
 from .utils import configure_opt
@@ -14,6 +13,7 @@ def train(cfg: Box):
     # Set up the output directory
     main_directory = os.path.dirname(os.path.abspath(__file__)).rsplit('/', 2)[0]
     cfg.sav_dir = os.path.join(main_directory, cfg.sav_dir)
+    cfg.out_dir = os.path.join(main_directory, cfg.out_dir)
 
     # Set up the model and device
     model, fabric = set_model(cfg)

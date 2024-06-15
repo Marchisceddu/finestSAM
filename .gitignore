@@ -3,7 +3,11 @@
 *.py[co]
 
 create_dataset/shp/*
+create_dataset/shp1/*
 finestSAM/sav/*.pth
 finestSAM/sav/loggers_finestSAM/*
 finestSAM/out/*
 dataset/*
+dataset1/*
+prove/*
+o.txt

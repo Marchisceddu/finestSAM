@@ -8,11 +8,13 @@ from typing import Tuple, List
 from box import Box
 from pycocotools.coco import COCO
 from .segment_anything.utils.transforms import ResizeLongestSide
+from .segment_anything.utils.amg import build_point_grid
 from torch.utils.data import (
     Dataset,
     DataLoader,
     random_split
 )
+from config import cfg_train as cfg
 
 
 class COCODataset(Dataset):
@@ -21,11 +23,9 @@ class COCODataset(Dataset):
             self, 
             root_dir: str, 
             annotation_file: str, 
-            cfg: Box,
             transform: transforms.Compose = None, 
             seed: int = None
         ):
-        self.cfg = cfg
         self.seed = seed
         self.root_dir = root_dir
         self.transform = transform
@@ -61,8 +61,21 @@ class COCODataset(Dataset):
         point_labels = []
         masks = []
 
+        '''
+        Si può predirre con la griglia mi sono studiato l'automatic, bisogna creare una griglia generica di 32x32 con valori delle coordinate che vadano da 0 a 1 (build_point_grid amg file)
+        e poi sclare questa griglia alla dimensione dell'immagine (riga 238 automatic), 
+        trovare i punti positivi di una maschera,
+        applcare l'algoritmo della distanza per assegnare questo punto alla distanza più vicino alla griglia auto,
+        normalizzare i punti come si faceva di già
+        dovrebbe essere fatto anche se le immagini non sono quasdrate perchè la griglia non si forma sul quadrato ma sulla dimensione originale dell'immagine e poi viene scalata,
+        lo fa anche il predittore in automatico
+        '''
+        points = build_point_grid(32)
+        points_scale = np.array((H, W))[None, ::-1]
+        points_for_image = points * points_scale
+
         # Get box, point and mask for any annotations
-        for ann in anns:
+        for ixx, ann in enumerate(anns):
             # Get the bounding box
             x, y, w, h = ann['bbox']
 
@@ -102,21 +115,31 @@ class COCODataset(Dataset):
             So, we need to filter out those annotations and keep only the ones that at least
             have the points that are needed for the training.  
             """
-            if len(list_point_1) > self.cfg.dataset.positive_points and len(list_point_0) > self.cfg.dataset.negative_points: 
+            if len(list_point_1) >= cfg.dataset.positive_points and len(list_point_0) >= cfg.dataset.negative_points: 
                 masks.append(mask)
                 boxes.append([x, y, x + w, y + h])
 
-                temp_list_point = []
-                for i in range(0, self.cfg.dataset.positive_points):
-                    idx = np.random.randint(0, len(list_point_1))
-                    temp_list_point.append(list_point_1[idx])
-                list_point_1 = temp_list_point.copy()
+                if False: # Mettere il controllo in config, se entra qui scegli un punto random altrimenti usa la griglia di punti
+                    temp_list_point = []
+                    for i in range(0, cfg.dataset.positive_points):
+                        idx = np.random.randint(0, len(list_point_1))
+                        temp_list_point.append(list_point_1[idx])
+                    list_point_1 = temp_list_point.copy()
 
-                temp_list_point = []
-                for i in range(0, self.cfg.dataset.negative_points):
-                    idx = np.random.randint(0, len(list_point_0))
-                    temp_list_point.append(list_point_0[idx])
-                list_point_0 = temp_list_point.copy()
+                    temp_list_point = []
+                    for i in range(0, cfg.dataset.negative_points):
+                        idx = np.random.randint(0, len(list_point_0))
+                        temp_list_point.append(list_point_0[idx])
+                    list_point_0 = temp_list_point.copy()
+                else:
+                    # Assegna un punto random di list_point_1 al più vicino presente a points_for_image
+                    idx = np.random.randint(0, len(list_point_1))
+                    distances = np.linalg.norm(points_for_image - list_point_1[idx], axis=1)
+                    nearest_point_index = np.argmin(distances)
+                    nearest_point = points_for_image[nearest_point_index]
+                    
+                    list_point_1 = [nearest_point]
+                    list_point_0 = []
 
                 list_label_0 = [0] * len(list_point_0)
                 list_label_1 = [1] * len(list_point_1)
@@ -172,36 +195,34 @@ class ResizeAndPad:
 
         return image, resized_masks, boxes, point_coords
 
-def get_collate_fn(cfg: Box):
-    def collate_fn(batch: List[Tuple]):
-        batched_data = []
 
-        for data in batch:
-            image, original_size, point_coord, point_label, boxes, masks, resized_masks, imo = data
+def collate_fn(batch: List[Tuple[torch.Tensor, Tuple[int, int], torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]]):
+    batched_data = []
 
-            if cfg.train_type == "custom":
-                if not cfg.prompts.use_boxes:
-                    boxes = None
-                if not cfg.prompts.use_points:
-                    point_coord = None
-                    point_label = None
-                if not cfg.prompts.use_masks:
-                    resized_masks = None
+    for data in batch:
+        image, original_size, point_coord, point_label, boxes, masks, resized_masks, imo = data
 
-            batched_data.append({
-                "image": image,
-                "original_size": original_size,
-                "point_coords": point_coord,
-                "point_labels": point_label,
-                "boxes": boxes,
-                "mask_inputs": resized_masks,
-                "gt_masks": masks,
-                "imo": imo,
-            })
+        if cfg.train_type == "custom":
+            if not cfg.custom_cfg.use_boxes:
+                boxes = None
+            if not cfg.custom_cfg.use_points:
+                point_coord = None
+                point_label = None
+            if not cfg.custom_cfg.use_masks:
+                resized_masks = None
 
-        return batched_data
-    
-    return collate_fn
+        batched_data.append({
+            "image": image,
+            "original_size": original_size,
+            "point_coords": point_coord,
+            "point_labels": point_label,
+            "boxes": boxes,
+            "mask_inputs": resized_masks,
+            "gt_masks": masks,
+            "imo": imo,
+        })
+
+    return batched_data
 
 
 def load_dataset(cfg: Box, img_size: int) -> Tuple[DataLoader, DataLoader]:
@@ -210,56 +231,31 @@ def load_dataset(cfg: Box, img_size: int) -> Tuple[DataLoader, DataLoader]:
 
     # Load the dataset
     main_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    dataset_path = os.path.join(main_directory, cfg.dataset.root_dir)
+    annotations_path = os.path.join(main_directory, cfg.dataset.annotation_file)
 
-    if cfg.dataset.auto_split:
-        data_path = os.path.join(main_directory, cfg.dataset.path.root_dir)
-        annotations_path = os.path.join(main_directory, cfg.dataset.path.annotation_file)
-
-        data = COCODataset(root_dir=data_path,
+    data = COCODataset(root_dir=dataset_path,
                         annotation_file=annotations_path,
-                        cfg=cfg,
-                        transform=transform,
-                        seed=cfg.seed_dataloader)
-        
-         # Calc the size of the validation set
-        total_size = len(data)
-        val_size = int(total_size * cfg.dataset.val_size)
-
-        # Set the seed 
-        generator = torch.Generator()
-        if cfg.seed_dataloader != None:
-            generator.manual_seed(cfg.seed_dataloader)
-
-        # Split the dataset into training and validation
-        train_data, val_data = random_split(data, [total_size - val_size, val_size], generator=generator)
-    else:
-        train_path = os.path.join(main_directory, cfg.dataset.train.root_dir)
-        val_path =  os.path.join(main_directory, cfg.dataset.val.root_dir)
-        train_annotations_path = os.path.join(main_directory, cfg.dataset.train.annotation_file)
-        val_annotations_path = os.path.join(main_directory, cfg.dataset.train.annotation_file)
-
-        train_data = COCODataset(root_dir=train_path,
-                        annotation_file=train_annotations_path,
-                        cfg=cfg,
                         transform=transform,
                         seed=cfg.seed_dataloader)
     
-        val_data = COCODataset(root_dir=val_path,
-                        annotation_file=val_annotations_path,
-                        cfg=cfg,
-                        transform=transform,
-                        seed=cfg.seed_dataloader)
+    # Calc the size of the validation set
+    total_size = len(data)
+    val_size = int(total_size * cfg.dataset.val_size)
+
+    # Split the dataset into training and validation
+    train_data, val_data = random_split(data, [total_size - val_size, val_size])
 
     train_dataloader = DataLoader(train_data,
                                   batch_size=cfg.batch_size,
                                   shuffle=True,
                                   num_workers=cfg.num_workers,
-                                  collate_fn=get_collate_fn(cfg))
+                                  collate_fn=collate_fn)
 
     val_dataloader = DataLoader(val_data,
                                 batch_size=cfg.batch_size,
                                 shuffle=False,
                                 num_workers=cfg.num_workers,
-                                collate_fn=get_collate_fn(cfg))
+                                collate_fn=collate_fn)
 
     return train_dataloader, val_dataloader

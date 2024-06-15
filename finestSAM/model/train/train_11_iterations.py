@@ -10,7 +10,7 @@ from .utils import (
     print_and_log_metrics
 )
 from .losses import (
-    IoULoss,
+    CalcIoU,
     DiceLoss,
     FocalLoss
 )
@@ -37,7 +37,7 @@ def train_11_iterations(
 
     focal_loss = FocalLoss(alpha=cfg.losses.focal_alpha, gamma=cfg.losses.focal_gamma)
     dice_loss = DiceLoss()
-    iou_loss = IoULoss()
+    iou_loss = CalcIoU() # cambiare il nome 
 
     new_logits = []
     new_point_coords = []
@@ -139,7 +139,7 @@ def train_11_iterations(
                 print_and_log_metrics(fabric, cfg, epoch, iter, batch_time, data_time, focal_losses, dice_losses, iou_losses, total_losses, best_score, train_dataloader)
 
         if (epoch > 1 and cfg.eval_interval > 0 and epoch % cfg.eval_interval == 0) or (epoch == cfg.num_epochs):
-            validate(fabric, cfg, model, val_dataloader, epoch)
+            validate(fabric, cfg, model, train_dataloader, epoch)
 
 
 def calc_points_train(

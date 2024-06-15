@@ -55,7 +55,7 @@ fonte: https://arxiv.org/abs/1708.02002
 
 class DiceLoss(nn.Module):
     
-    def __init__(self, smooth: int = 1):
+    def __init__(self, smooth: int = 1e-7):
         super().__init__()
         self.smooth = smooth
 
@@ -70,25 +70,38 @@ class DiceLoss(nn.Module):
                     (0 for the negative class and 1 for the positive class).
             num_masks: Number of masks in the batch
         """
+        # inputs = inputs.sigmoid()        
+        # inputs = inputs.flatten(1)
+        # targets = targets.flatten(1)
 
-        inputs = inputs.squeeze()
-        targets = targets.squeeze()
-
-        inputs = inputs.sigmoid()
-        inputs = inputs.flatten(1)
-        targets = targets.flatten(1)
-
-        numerator = 2 * (inputs * targets).sum(1)
-        denominator = inputs.sum(-1) + targets.sum(-1)
-        loss = 1 - (numerator + self.smooth) / (denominator + self.smooth)
+        # numerator = 2 * (inputs * targets).sum(1)
+        # denominator = inputs.sum(-1) + targets.sum(-1)
+        # loss = 1 - (numerator + self.smooth) / (denominator + self.smooth)
         
-        return loss.sum() / num_masks
-
+        # return loss.sum() / num_masks
+        # #comment out if your model contains a sigmoid or equivalent activation layer
+        inputs = F.sigmoid(inputs)       
+        
+        #flatten label and prediction tensors
+        inputs = inputs.reshape(-1)
+        targets = targets.reshape(-1)
+        
+        intersection = (inputs * targets).sum()                            
+        dice = (2.*intersection + self.smooth)/(inputs.sum() + targets.sum() + self.smooth)  
+        
+        return 1 - dice
 
 
 class FocalLoss(nn.Module):
 
-    def __init__(self, alpha: float = 0.75, gamma: int = 2):
+    def __init__(self, gamma: int, alpha: float = -1):
+        """
+        Args:
+            alpha: (optional) Weighting factor in range (0,1) to balance
+                positive vs negative examples. Default = -1 (no weighting).
+            gamma: Exponent of the modulating factor (1 - p_t) to
+                balance easy vs hard examples.
+        """
         super().__init__()
         self.alpha = alpha
         self.gamma = gamma
@@ -104,38 +117,46 @@ class FocalLoss(nn.Module):
                     (0 for the negative class and 1 for the positive class).
             num_masks: Number of masks in the batch
             
-            alpha: (optional) Weighting factor in range (0,1) to balance
-                    positive vs negative examples. Default = -1 (no weighting).
-            gamma: Exponent of the modulating factor (1 - p_t) to
-                balance easy vs hard examples.
             Returns:
                 Loss tensor
         """
-        inputs = inputs.squeeze()
-        targets = targets.squeeze()
+        # prob = inputs.sigmoid()
+        # inputs = inputs.flatten(1)
+        # prob = prob.flatten(1)
+        # targets = targets.flatten(1)
 
-        prob = inputs.sigmoid()
-        inputs = inputs.flatten(1)
-        prob = prob.flatten(1)
-        targets = targets.flatten(1)
+        # ce_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduction="none")
+        # p_t = prob * targets + (1 - prob) * (1 - targets)
+        # loss = ce_loss * ((1 - p_t) ** self.gamma)
 
-        ce_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduction="none")
-        p_t = prob * targets + (1 - prob) * (1 - targets)
-        loss = ce_loss * ((1 - p_t) ** self.gamma)
+        # if self.alpha >= 0:
+        #     alpha_t = self.alpha * targets + (1 - self.alpha) * (1 - targets)
+        #     loss = alpha_t * loss
 
-        if self.alpha >= 0:
-            alpha_t = self.alpha * targets + (1 - self.alpha) * (1 - targets)
-            loss = alpha_t * loss
-
-        return loss.mean(1).sum() / num_masks
+        # return loss.mean(1).sum() / num_masks
+    
+        #comment out if your model contains a sigmoid or equivalent activation layer
+        inputs = F.sigmoid(inputs)       
+        
+        #flatten label and prediction tensors
+        inputs = inputs.reshape(-1)
+        targets = targets.reshape(-1)
+        
+        #first compute binary cross-entropy 
+        BCE = F.binary_cross_entropy(inputs, targets, reduction='mean')
+        BCE_EXP = torch.exp(-BCE)
+        focal_loss = self.alpha * (1-BCE_EXP)**self.gamma * BCE
+                       
+        return focal_loss
     
 
-class IoULoss(nn.Module):
+class CalcIoU(nn.Module):
 
     def __init__(self):
         super().__init__()
+        self.epsilon = 1e-7
 
-    def forward(self, pred_mask: torch.Tensor, gt_mask: torch.Tensor) -> torch.Tensor:
+    def forward(self, inputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
         """
         Compute the Intersection over Union (IoU) loss.
         Args:
@@ -145,23 +166,13 @@ class IoULoss(nn.Module):
                     classification label for each element in inputs
                     (0 for the negative class and 1 for the positive class).
         """
-         
-        pred_mask = (pred_mask >= 0.5).float()
-        intersection = torch.sum(torch.mul(pred_mask, gt_mask), dim=(1, 2))
-        union = torch.sum(pred_mask, dim=(1,2)) + torch.sum(gt_mask, dim=(1, 2)) - intersection
-        epsilon = 1e-7
-        batch_iou = intersection / (union + epsilon)
+        inputs = (inputs > 0).float()
 
-        # pred_mask = (pred_mask >= 0.5).float()
-        # pred_mask = pred_mask.squeeze()
-        # gt_mask = gt_mask.squeeze()
-        
-        # pred_mask = pred_mask.flatten(1)
-        # gt_mask = gt_mask.flatten(1)
-            
-        # intersection = (pred_mask * gt_mask).sum(1)
-        # union = pred_mask.sum(1) + gt_mask.sum(1) - intersection
-        # epsilon = 1e-7
-        # batch_iou = intersection / (union + epsilon)
+        inputs = inputs.flatten(1)
+        targets = targets.flatten(1)
 
-        return batch_iou
+        intersection = (inputs * targets).sum(1)
+        union = inputs.sum(1) + targets.sum(1) - intersection
+        iou = (intersection + self.epsilon) / (union + self.epsilon)
+
+        return iou

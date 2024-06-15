@@ -8,6 +8,11 @@ from box import Box
 from lightning.fabric.fabric import _FabricOptimizer
 from torch.utils.data import DataLoader
 
+from ..predictions.utils import (
+    show_mask,
+)
+import matplotlib.pyplot as plt
+
 
 class AverageMeter:
     """Computes and stores the average and current value."""
@@ -28,12 +33,26 @@ class AverageMeter:
         self.avg = self.sum / self.count
 
 
+class Metrics:
+    def __init__(self):
+        self.batch_time = AverageMeter()
+        self.data_time = AverageMeter()
+
+        self.focal_losses = AverageMeter()
+        self.dice_losses = AverageMeter()
+        self.space_iou_losses = AverageMeter()
+        self.total_losses = AverageMeter()
+
+        self.ious = AverageMeter()
+        self.ious_pred = AverageMeter()
+
+
 def configure_opt(cfg: Box, model: FinestSAM) -> Tuple[_FabricOptimizer, _FabricOptimizer]:
 
     def lr_lambda(step):
         if step < cfg.opt.warmup_steps:
             return step / cfg.opt.warmup_steps
-        elif step < cfg.opt.steps[0]:
+        elif cfg.opt.steps == None or step < cfg.opt.steps[0]:
             return 1.0
         elif step < cfg.opt.steps[1]:
             return 1 / cfg.opt.decay_factor
@@ -78,23 +97,39 @@ def validate(
         for iter, batched_data in enumerate(val_dataloader):
 
             predictor = model.get_predictor()
-
+            
             pred_masks = []
             for data in batched_data:
                 predictor.set_image(data["imo"])
-                masks, _, _ = predictor.predict_torch(
+                masks, stability_scores, _  = predictor.predict_torch(
                     point_coords=data["point_coords"],
                     point_labels=data["point_labels"],
-                    boxes=None,
-                    multimask_output=False,
+                    boxes=data["boxes"],
+                    multimask_output=cfg.multimask_output,
                 )
-                pred_masks.append(masks)
+
+                if cfg.multimask_output:
+                    # For each mask, get the mask with the highest stability score
+                    separated_masks = torch.unbind(masks, dim=1)
+                    separated_scores = torch.unbind(stability_scores, dim=1)
+
+                    stability_score = [torch.mean(score) for score in separated_scores]
+                    pred_masks.append(separated_masks[torch.argmax(torch.tensor(stability_score))])
+
+                    # plt.imshow(data["imo"])
+                    # for i, mask in enumerate(separated_masks[torch.argmax(torch.tensor(stability_score))]):
+                    #     show_mask(mask, plt.gca(), seed=i)
+                    # plt.axis('off')
+                    # plt.savefig(os.path.join(cfg.out_dir, "m.png"))
+                    # plt.clf()
+                else:
+                    pred_masks.append(masks)
 
             gt_masks = [data["gt_masks"] for data in batched_data]  
             num_images = len(batched_data)
             for pred_mask, gt_mask in zip(pred_masks, gt_masks):
                 batch_stats = smp.metrics.get_stats(
-                    pred_mask.squeeze(1),
+                    pred_mask,
                     gt_mask.int(),
                     mode='binary',
                     threshold=0.5,
@@ -103,7 +138,7 @@ def validate(
                 ious.update(batch_iou, num_images)
             
             fabric.print(
-                f'Val: [{epoch}] - [{iter}/{len(val_dataloader)}]: Mean IoU: [{ious.avg:.4f}]'
+                f'Val: [{epoch}] - [{iter+1}/{len(val_dataloader)}]: Mean IoU: [{ious.avg:.4f}]'
             )
 
         fabric.print(f'Validation [{epoch}]: Mean IoU: [{ious.avg:.4f}]')
@@ -122,27 +157,22 @@ def print_and_log_metrics(
     cfg: Box,
     epoch: int,
     iter: int,
-    batch_time: AverageMeter,
-    data_time: AverageMeter,
-    focal_losses: AverageMeter,
-    dice_losses: AverageMeter,
-    iou_losses: AverageMeter,
-    total_losses: AverageMeter,
-    best_score: float,
+    metrics: Metrics,
     train_dataloader: DataLoader,
 ):
     fabric.print(f'Epoch: [{epoch}][{iter+1}/{len(train_dataloader)}]'
-                 f' | Time [{batch_time.val:.3f}s ({batch_time.avg:.3f}s)]'
-                 f' | Data [{data_time.val:.3f}s ({data_time.avg:.3f}s)]'
-                 f' | a Focal Loss [{cfg.losses.focal_ratio * focal_losses.val:.4f} ({cfg.losses.focal_ratio * focal_losses.avg:.4f})]'
-                 f' | Dice Loss [{cfg.losses.dice_ratio * dice_losses.val:.4f} ({cfg.losses.dice_ratio * dice_losses.avg:.4f})]'
-                 f' | IoU Loss [{iou_losses.val:.4f} ({iou_losses.avg:.4f})]'
-                 f' | Total Loss [{total_losses.val:.4f} ({total_losses.avg:.4f})]'
-                 f' | Mask quality [({best_score:.4f})]')
+                 f' | Time [{metrics.batch_time.val:.3f}s ({metrics.batch_time.avg:.3f}s)]'
+                 f' | Data [{metrics.data_time.val:.3f}s ({metrics.data_time.avg:.3f}s)]'
+                 f' | Focal Loss [{metrics.focal_losses.val:.4f} ({metrics.focal_losses.avg:.4f})]'
+                 f' | Dice Loss [{metrics.dice_losses.val:.4f} ({metrics.dice_losses.avg:.4f})]'
+                 f' | Space IoU Loss [{metrics.space_iou_losses.val:.4f} ({metrics.space_iou_losses.avg:.4f})]'
+                 f' | Total Loss [{metrics.total_losses.val:.4f} ({metrics.total_losses.avg:.4f})]'
+                 f' | IoU [{metrics.ious.val:.4f} ({metrics.ious.avg:.4f})]'
+                 f' | Pred IoU [{metrics.ious_pred.val:.4f} ({metrics.ious_pred.avg:.4f})]')
     steps = epoch * len(train_dataloader) + iter
     log_info = {
-        'Loss': total_losses.val,
-        'alpha focal loss': cfg.losses.focal_ratio * focal_losses.val,
-        'dice loss': cfg.losses.dice_ratio * dice_losses.val,
+        'total loss': metrics.total_losses.val,
+        'focal loss': metrics.focal_losses.val,
+        'dice loss':  metrics.dice_losses.val,
     }
     fabric.log_dict(log_info, step=steps)

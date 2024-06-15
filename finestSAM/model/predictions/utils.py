@@ -21,9 +21,10 @@ def show_anns(anns, opacity=0.35):
 
 # Per predittori manuali
 # (AGGIUSTARE PER FARLO FUNZIONARE CON GPU)
-def show_mask(mask, ax, random_color=False):
+def show_mask(mask, ax, random_color=True, seed=None):
+    np.random.seed(seed)
     if random_color:
-        color = np.concatenate([np.random.random(3), np.array([0.6])], axis=0)
+        color = np.concatenate([np.random.random(3), np.array([1])], axis=0)
     else:
         color = np.array([30/255, 144/255, 255/255, 0.6])
     h, w = mask.shape[-2:]

@@ -71,7 +71,7 @@ def automatic_predictions(
 
     # Salvataggio delle predizioni come file .png
     plt.imshow(image)
-    show_anns(masks, opacity=0.8)
+    show_anns(masks, opacity=1)
     plt.axis('off')
     plt.savefig(os.path.join(cfg.out_dir, "output.png"))
     plt.clf()
@@ -153,10 +153,10 @@ def pred_boxes(cfg: Box):
         #  Save the masks
 
 
-def pred_points(cfg: Box):
+def pred_points(cfg: Box, path_i: str, path_a):
     main_directory = os.path.dirname(os.path.abspath(__file__))
 
-    # Load the model 
+    # Load the model
     fabric = L.Fabric(accelerator=cfg.device,
                     devices=cfg.num_devices,
                     strategy="auto")

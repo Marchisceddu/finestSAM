@@ -79,13 +79,13 @@ class FinestSAM(nn.Module):
         input_images = torch.stack([self.preprocess(x["image"]) for x in batched_input], dim=0)
         image_embeddings = self.model.image_encoder(input_images)
 
-        if are_logits:
-          input_masks = [x["mask_inputs"] for x in batched_input]
-        else:
-          input_masks = [self.preprocess(x["mask_inputs"]) for x in batched_input]    
+        input_masks = [x["mask_inputs"] if "mask_inputs" in x and x["mask_inputs"] is not None else None for x in batched_input]
+        if not are_logits:
+            input_masks = [self.preprocess(mask) if mask is not None else None for mask in input_masks]
 
         outputs = []
         for image_record, curr_embedding, masks in zip(batched_input, image_embeddings, input_masks):
+            
             if "point_coords" in image_record and image_record["point_coords"] is not None:
                 points = (image_record["point_coords"], image_record["point_labels"])
             else:

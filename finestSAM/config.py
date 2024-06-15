@@ -8,42 +8,42 @@ config = {
     "out_dir": "out",
 
     "model": {
-        "type": 'vit_h',
-        "checkpoint": "sam_vit_h_4b8939.pth",
+        "type": 'vit_b',
+        "checkpoint": "sam_vit_b_01ec64.pth",
     },
 }
 
 config_train = {
-    "seed_dataloader": None,
-    "batch_size": 2,
+    "seed_dataloader": 42,
+    "batch_size": 1,
     "num_workers": 0,
 
     "train_type": "custom",
     "num_epochs": 100,
-    "eval_interval": 4,
-    "eval_improvement": 0.05,
-    "custom_cfg": {
+    "eval_interval": 10,
+    "eval_improvement": 0.,
+    "prompts": {
         "use_boxes": True,
-        "use_points": True,
-        "use_masks": True,
+        "use_points": False,
+        "use_masks": False,
+        "use_logits": False,
     },
-    "cross-validation_cfg": { 
-        "k_fold": 5,
-    },
+    "multimask_output": True,
 
     "opt": {
         "learning_rate": 8e-4,
         "weight_decay": 1e-4,
         "decay_factor": 10,
-        "steps": [60000, 86666],
-        "warmup_steps": 250,
+        "steps": None,
+        "warmup_steps": 0,
     },
 
     "losses": {
         "focal_ratio": 20.,
         "dice_ratio": 1.,
-        "focal_alpha": 0.75,
-        "focal_gamma": 2,
+        "iou_ratio": 1.,
+        "focal_alpha": 0.5,
+        "focal_gamma": 0,
     },
 
     "model_layer": {
@@ -55,11 +55,22 @@ config_train = {
     },
 
     "dataset": {
-        "root_dir": "../dataset/images",
-        "annotation_file": "../dataset/annotations.json",
+        "auto_split": True,
+        "path": {
+            "root_dir": "../dataset/images",
+            "annotation_file": "../dataset/annotations.json"
+        },
+        "train": {
+            "root_dir": "../datasetCalcio",
+            "annotation_file": "../datasetCalcio/annotations.json"
+        },
+        "val": {
+            "root_dir": "../datasetC/val",
+            "annotation_file": "../datasetC/val/annotations.json"
+        },
         "val_size": 0.2,
-        "positive_points": 4,
-        "negative_points": 4,
+        "positive_points": 1,
+        "negative_points": 0,
     }
 }
 

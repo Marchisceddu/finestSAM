@@ -73,6 +73,8 @@ Generali:
 ```python
 "device": str = "auto" or "gpu" or "cpu", # Hardware su cui eseguire il modello (non è supportata mps, se si usa un mac m1 impostare su cpu)
 "num_devices": int # Numero di dispositivi da utilizzare
+            or (list str) # definire queli GPU utilizzare
+            or str = "auto",
 "seed_device": int / None per random,
 "sav_dir": str, # Cartella di output per i salvataggi
 "out_dir": str, # Cartella di output per le predizioni
@@ -86,8 +88,6 @@ Generali:
 Train:
 ```python
 "seed_dataloader": int / None per random,
-                or (list str) # definire queli GPU utilizzare
-                or str = "auto",
 "batch_size": int, # Grandezza batch delle immagini
 "num_workers": int, # Quanti sottoprocessi utilizzare per il caricamento dei dati (0 -> i dati verranno caricati nel processo principale)
 
@@ -95,14 +95,13 @@ Train:
 "num_epochs": int, # Numero di epoche di train
 "eval_interval": int, # Intervallo di validazione
 "eval_improvement": float (0-1), # Percentuale oltre il quale avviene il salvataggio
-"custom_cfg": {
+"prompts": {
     "use_boxes": bool, # Se True usa le boxe per il train
     "use_points": bool, # Se True usa i punti per il train
     "use_masks": bool, # Se True usa le annotazioni per il train
+    "use_logits": bool, # Se True usa i logits dell'epoca precedente (se True viene ignorato use_masks)
 },
-"cross-validation_cfg": { 
-    "k_fold": int, # (DA INSERIRE)
-},
+"multimask_output": bool,
 
 "opt": {
     "learning_rate": int,
@@ -115,6 +114,7 @@ Train:
 "losses": {
     "focal_ratio": float, # Peso di Focal loss sulla loss totale
     "dice_ratio": float, # Peso di Dice loss sulla loss totale
+    "iou_ratio": float, # Peso di Space IoU loss sulla loss totale
     "focal_alpha": float, # Valore di alpha per la Focal loss
     "focal_gamma": int, # Valore di gamma per la Focal loss
 },
@@ -128,8 +128,20 @@ Train:
 },
 
 "dataset": {
-    "root_dir": str, # Path per la cartella delle immagini del dataset
-    "annotation_file": str, # Path per la cartella delle annotazioni del dataset
+    "auto_split": bool, # Se True verra usato il dataset presente in path ed effettuare uno split per la validation della dimensione di val_size 
+        "path": {
+            "root_dir": str,
+            "annotation_file": str,
+        },
+        "train": {
+            "root_dir": str,
+            "annotation_file": str,
+        },
+        "val": {
+            "root_dir": str,
+            "annotation_file": str,
+        },
+
     "val_size": float (0-1), # Percentuale grandezza validation dataset
     "positive_points": int, # Numero punti positivi passati con __getitem__
     "negative_points": int, # Numero punti negativi passati con __getitem__
