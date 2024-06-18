@@ -8,7 +8,12 @@ from box import Box
 
 
 def train(cfg: Box):
-    """Main training function."""
+    """
+    Main training function.
+    
+    Args:
+        cfg (Box): The configuration file.
+    """
 
     # Set up the output directory
     main_directory = os.path.dirname(os.path.abspath(__file__)).rsplit('/', 2)[0]

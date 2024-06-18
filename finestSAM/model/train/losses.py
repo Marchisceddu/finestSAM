@@ -70,26 +70,16 @@ class DiceLoss(nn.Module):
                     (0 for the negative class and 1 for the positive class).
             num_masks: Number of masks in the batch
         """
-        # inputs = inputs.sigmoid()        
-        # inputs = inputs.flatten(1)
-        # targets = targets.flatten(1)
+        inputs = inputs.sigmoid()    
 
-        # numerator = 2 * (inputs * targets).sum(1)
-        # denominator = inputs.sum(-1) + targets.sum(-1)
-        # loss = 1 - (numerator + self.smooth) / (denominator + self.smooth)
+        inputs = inputs.flatten(1)
+        targets = targets.flatten(1)
+
+        numerator = 2 * (inputs * targets).sum(1)
+        denominator = inputs.sum(1) + targets.sum(1)
+        loss = 1 - (numerator + self.smooth) / (denominator + self.smooth)
         
-        # return loss.sum() / num_masks
-        # #comment out if your model contains a sigmoid or equivalent activation layer
-        inputs = F.sigmoid(inputs)       
-        
-        #flatten label and prediction tensors
-        inputs = inputs.reshape(-1)
-        targets = targets.reshape(-1)
-        
-        intersection = (inputs * targets).sum()                            
-        dice = (2.*intersection + self.smooth)/(inputs.sum() + targets.sum() + self.smooth)  
-        
-        return 1 - dice
+        return loss.sum() / num_masks
 
 
 class FocalLoss(nn.Module):
@@ -120,41 +110,28 @@ class FocalLoss(nn.Module):
             Returns:
                 Loss tensor
         """
-        # prob = inputs.sigmoid()
-        # inputs = inputs.flatten(1)
-        # prob = prob.flatten(1)
-        # targets = targets.flatten(1)
+        prob = inputs.sigmoid()
 
-        # ce_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduction="none")
-        # p_t = prob * targets + (1 - prob) * (1 - targets)
-        # loss = ce_loss * ((1 - p_t) ** self.gamma)
+        inputs = inputs.flatten(1)
+        prob = prob.flatten(1)
+        targets = targets.flatten(1)
 
-        # if self.alpha >= 0:
-        #     alpha_t = self.alpha * targets + (1 - self.alpha) * (1 - targets)
-        #     loss = alpha_t * loss
+        ce_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduction="none")
+        p_t = prob * targets + (1 - prob) * (1 - targets)
+        loss = ce_loss * ((1 - p_t) ** self.gamma)
 
-        # return loss.mean(1).sum() / num_masks
-    
-        #comment out if your model contains a sigmoid or equivalent activation layer
-        inputs = F.sigmoid(inputs)       
-        
-        #flatten label and prediction tensors
-        inputs = inputs.reshape(-1)
-        targets = targets.reshape(-1)
-        
-        #first compute binary cross-entropy 
-        BCE = F.binary_cross_entropy(inputs, targets, reduction='mean')
-        BCE_EXP = torch.exp(-BCE)
-        focal_loss = self.alpha * (1-BCE_EXP)**self.gamma * BCE
-                       
-        return focal_loss
+        if self.alpha >= 0:
+            alpha_t = self.alpha * targets + (1 - self.alpha) * (1 - targets)
+            loss = alpha_t * loss
+
+        return loss.mean(1).sum() / num_masks
     
 
 class CalcIoU(nn.Module):
 
-    def __init__(self):
+    def __init__(self, smooth: int = 1e-7):
         super().__init__()
-        self.epsilon = 1e-7
+        self.smooth = smooth
 
     def forward(self, inputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
         """
@@ -173,6 +150,6 @@ class CalcIoU(nn.Module):
 
         intersection = (inputs * targets).sum(1)
         union = inputs.sum(1) + targets.sum(1) - intersection
-        iou = (intersection + self.epsilon) / (union + self.epsilon)
+        iou = (intersection + self.smooth) / (union + self.smooth)
 
         return iou

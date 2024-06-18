@@ -71,7 +71,15 @@ def save(
     out_dir: str,
     name: str = "ckpt"
 ):
-    """Save the model checkpoint."""
+    """
+    Save the model checkpoint.
+    
+    Args:
+        fabric (L.Fabric): The lightning fabric.
+        model (FinestSAM): The model.
+        out_dir (str): The output directory.
+        name (str): The name of the checkpoint without .pth.
+    """
 
     fabric.print(f"Saving checkpoint to {out_dir}")
     name = name + ".pth"
@@ -88,8 +96,17 @@ def validate(
         epoch: int,
         last_score: float = 0.
     ) -> float: 
-    """Validation function for the SAM model.""" # Aggiungere la possibilità di scegliere su cosa validare punti o box o entrambi
+    """
+    Validation function for the SAM model.
 
+    Args:
+        fabric (L.Fabric): The lightning fabric.
+        cfg (Box): The configuration file.
+        model (FinestSAM): The model.
+        val_dataloader (DataLoader): The validation dataloader.
+        epoch (int): The current epoch.
+        last_score (float): The last score.
+    """
     model.eval()
     ious = AverageMeter()
     
@@ -100,7 +117,7 @@ def validate(
             
             pred_masks = []
             for data in batched_data:
-                predictor.set_image(data["imo"])
+                predictor.set_image(data["original_image"])
                 masks, stability_scores, _  = predictor.predict_torch(
                     point_coords=data["point_coords"],
                     point_labels=data["point_labels"],
@@ -116,12 +133,15 @@ def validate(
                     stability_score = [torch.mean(score) for score in separated_scores]
                     pred_masks.append(separated_masks[torch.argmax(torch.tensor(stability_score))])
 
-                    # plt.imshow(data["imo"])
-                    # for i, mask in enumerate(separated_masks[torch.argmax(torch.tensor(stability_score))]):
-                    #     show_mask(mask, plt.gca(), seed=i)
-                    # plt.axis('off')
-                    # plt.savefig(os.path.join(cfg.out_dir, "m.png"))
-                    # plt.clf()
+                    # STAMPA DI DEBUG ELIMINARE
+                    plt.imshow(data["original_image"])
+                    for i, mask in enumerate(separated_masks[torch.argmax(torch.tensor(stability_score))]):
+                        show_mask(mask, plt.gca(), seed=i)
+                    plt.axis('off')
+                    plt.savefig(os.path.join(cfg.out_dir, "m.png"))
+                    plt.show()
+                    plt.clf()
+                    plt.close('all')
                 else:
                     pred_masks.append(masks)
 
@@ -160,6 +180,18 @@ def print_and_log_metrics(
     metrics: Metrics,
     train_dataloader: DataLoader,
 ):
+    """
+    Print and log the metrics for the training.
+    
+    Args:
+        fabric (L.Fabric): The fabric object.
+        cfg (Box): The configuration file.
+        epoch (int): The current epoch.
+        iter (int): The current iteration.
+        metrics (Metrics): The metrics object.
+        train_dataloader (DataLoader): The training dataloader.
+    """
+
     fabric.print(f'Epoch: [{epoch}][{iter+1}/{len(train_dataloader)}]'
                  f' | Time [{metrics.batch_time.val:.3f}s ({metrics.batch_time.avg:.3f}s)]'
                  f' | Data [{metrics.data_time.val:.3f}s ({metrics.data_time.avg:.3f}s)]'
@@ -176,3 +208,39 @@ def print_and_log_metrics(
         'dice loss':  metrics.dice_losses.val,
     }
     fabric.log_dict(log_info, step=steps)
+
+def print_graphs(metrics: dict[list], out_plots: str):
+    """
+    Print the graphs for the metrics.
+    
+    Args:
+        metrics (dict[list]): The metrics to plot.
+        out_plots (str): The output directory for the plots.
+    """
+    metric_names = ["dice_loss", "focal_loss", "space_iou_loss", "total_loss", "iou", "iou_pred"]
+
+    for metric_name in metric_names:
+        plt.plot(metrics[metric_name], label=metric_name.capitalize())
+        plt.title(metric_name.capitalize())
+        plt.legend()
+        plt.savefig(os.path.join(out_plots, f"{metric_name}.png"))
+        plt.show()
+        plt.clf()
+        
+    for metric_name in metric_names:
+        plt.plot(metrics[metric_name], label=metric_name.capitalize())
+    plt.title("All Metrics")
+    plt.xlabel('Epoch')
+    plt.ylabel('Value')
+    plt.legend()
+
+    plt2 = plt.gca().twinx()
+    plt2.plot(metrics["total_loss"], color='black', linestyle='--', label="Total Loss")
+    plt2.set_ylabel('Total Loss')
+
+    plt.legend(loc='upper left')
+    plt.savefig(os.path.join(out_plots, "all_metrics.png"))
+    plt.show()
+    plt.clf()
+
+    plt.close('all')

@@ -74,6 +74,7 @@ def automatic_predictions(
     show_anns(masks, opacity=1)
     plt.axis('off')
     plt.savefig(os.path.join(cfg.out_dir, "output.png"))
+    plt.show()
     plt.clf()
 
     # Salvataggio delle predizioni come file .svg
@@ -84,8 +85,10 @@ def automatic_predictions(
     ax.set_xticks([])
     plt.savefig(os.path.join(cfg.out_dir, "output.svg"))
     plt.clf()
-
+    
+    plt.close('all')
     print("Predizioni Salvate")
+
 
 
 # Predittori manuali, da cambiare

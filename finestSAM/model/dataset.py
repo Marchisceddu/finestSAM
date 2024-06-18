@@ -25,6 +25,14 @@ class COCODataset(Dataset):
             transform: transforms.Compose = None, 
             seed: int = None
         ):
+        """
+        Args:
+            root_dir (str): The root directory of the images.
+            annotation_file (str): The path to the annotation file.
+            cfg (Box): The configuration file.
+            transform (transforms.Compose): The transformation to apply to the data.
+            seed (int): The seed for the random number generator.
+        """
         self.cfg = cfg
         self.seed = seed
         self.root_dir = root_dir
@@ -38,7 +46,21 @@ class COCODataset(Dataset):
     def __len__(self):
         return len(self.image_ids)
     
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, Tuple[int, int], torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    def __getitem__(self, idx: int) -> Tuple:
+        """
+        Args:
+            idx (int): The index of the image to get.
+        Returns:
+            Tuple: 
+                The image, 
+                the original image,
+                the original size of the image, 
+                the point coordinates, 
+                the point labels, 
+                the boxes, 
+                the masks, 
+                the resized masks, 
+        """
         # Set the seed for reproducibility
         np.random.seed(self.seed)
 
@@ -48,7 +70,7 @@ class COCODataset(Dataset):
         image_path = os.path.join(self.root_dir, image_info['file_name'])
         image = cv2.imread(image_path)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        imo = image.copy()
+        original_image = image.copy()
 
         # Get original size of the image
         H, W, _ = image.shape
@@ -137,7 +159,7 @@ class COCODataset(Dataset):
         # Add channel dimension to the masks for compatibility with the model
         resized_masks = resized_masks.unsqueeze(1)
         
-        return image, original_size, point_coords, point_labels, boxes, masks, resized_masks, imo
+        return image, original_image, original_size, point_coords, point_labels, boxes, masks, resized_masks
     
 
 class ResizeAndPad:
@@ -177,7 +199,7 @@ def get_collate_fn(cfg: Box):
         batched_data = []
 
         for data in batch:
-            image, original_size, point_coord, point_label, boxes, masks, resized_masks, imo = data
+            image, original_image, original_size, point_coord, point_label, boxes, masks, resized_masks = data
 
             if cfg.train_type == "custom":
                 if not cfg.prompts.use_boxes:
@@ -190,13 +212,13 @@ def get_collate_fn(cfg: Box):
 
             batched_data.append({
                 "image": image,
+                "original_image": original_image,
                 "original_size": original_size,
                 "point_coords": point_coord,
                 "point_labels": point_label,
                 "boxes": boxes,
                 "mask_inputs": resized_masks,
                 "gt_masks": masks,
-                "imo": imo,
             })
 
         return batched_data
@@ -205,6 +227,14 @@ def get_collate_fn(cfg: Box):
 
 
 def load_dataset(cfg: Box, img_size: int) -> Tuple[DataLoader, DataLoader]:
+    """
+    Load the dataset and return the dataloaders for training and validation.
+    Args:
+        cfg (Box): The configuration file.
+        img_size (int): The size of the image to resize to.
+    Returns:
+        Tuple[DataLoader, DataLoader]: The training and validation dataloaders.
+    """
     # Set up the transformation for the dataset
     transform = ResizeAndPad(img_size)
 

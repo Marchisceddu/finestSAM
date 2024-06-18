@@ -23,8 +23,8 @@ config_train = {
     "eval_interval": 10,
     "eval_improvement": 0.,
     "prompts": {
-        "use_boxes": True,
-        "use_points": False,
+        "use_boxes": False,
+        "use_points": True,
         "use_masks": False,
         "use_logits": False,
     },
@@ -35,15 +35,15 @@ config_train = {
         "weight_decay": 1e-4,
         "decay_factor": 10,
         "steps": None,
-        "warmup_steps": 0,
+        "warmup_steps": 30,
     },
 
     "losses": {
         "focal_ratio": 20.,
         "dice_ratio": 1.,
         "iou_ratio": 1.,
-        "focal_alpha": 0.5,
-        "focal_gamma": 0,
+        "focal_alpha": 0.8,
+        "focal_gamma": 2,
     },
 
     "model_layer": {
@@ -57,8 +57,8 @@ config_train = {
     "dataset": {
         "auto_split": True,
         "path": {
-            "root_dir": "../dataset/images",
-            "annotation_file": "../dataset/annotations.json"
+            "root_dir": "../dataset2/images",
+            "annotation_file": "../dataset2/annotations.json"
         },
         "train": {
             "root_dir": "../datasetCalcio",

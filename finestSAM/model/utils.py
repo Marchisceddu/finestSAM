@@ -8,7 +8,14 @@ from lightning.fabric.loggers import TensorBoardLogger
 
 
 def set_model(cfg: Box) -> Tuple[FinestSAM, L.Fabric]:
-    """Set the device and the model."""
+    """
+    Set the device and the model.
+    
+    Args:
+        cfg (Box): The configuration file.
+    Returns:
+        Tuple[FinestSAM, L.Fabric]: The model and the fabric.
+    """
     loggers = [TensorBoardLogger(cfg.sav_dir, name="loggers_finestSAM")] if torch.is_grad_enabled() else None
 
     fabric = L.Fabric(accelerator=cfg.device,

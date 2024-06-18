@@ -15,6 +15,7 @@ class FinestSAM(nn.Module):
         self.cfg = cfg
 
     def setup(self):
+        """Set up the model."""
         checkpoint = os.path.join(self.cfg.sav_dir, self.cfg.model.checkpoint)
 
         self.model = sam_model_registry[self.cfg.model.type](checkpoint=checkpoint)
@@ -47,7 +48,7 @@ class FinestSAM(nn.Module):
             excluded if it is not present.
               'image': The image as a torch tensor in 3xHxW format,
                 already transformed for input to the model.
-                (H o W devono avere la dimensione minima di self.model.image_encoder.img_size) TRADURRE
+                (H or W must have the minimum size of self.model.image_encoder.img_size)
               'original_size': (tuple(int, int)) The original size of
                 the image before transformation, as (H, W).
               'point_coords': (torch.Tensor) Batched point prompts for
@@ -59,7 +60,7 @@ class FinestSAM(nn.Module):
                 Already transformed to the input frame of the model.
               'mask_inputs': (torch.Tensor) Batched mask inputs to the model,
                 in the form Bx1xHxW.
-                (devono essere 1/4 della dimensione dell'immagine post trasformazione quindi self.model.image_encoder.img_size//4) TRADURRE
+                (must be 1/4 the size of the image post-transformation, so self.model.image_encoder.img_size//4)
           multimask_output (bool): Whether the model should predict multiple
             disambiguating masks, or return a single mask.
 
