@@ -73,7 +73,7 @@ def shp_to_bm(tif, shp, output_folder):
     gdf = gpd.read_file(shp)
 
     # Create the output folder if it does not exist
-    os.makedirs(f"{output_folder}", exist_ok = True)
+    os.makedirs(f"{output_folder}", exist_ok=True)
 
     # Use rasterio to read the TIF file
     with rasterio.open(tif) as src:
@@ -82,7 +82,7 @@ def shp_to_bm(tif, shp, output_folder):
         crs = src.crs
 
         # Fix the CRS of the shapefile if it is different from the TIF file
-        if(gdf.crs != crs):
+        if gdf.crs != crs:
             gdf = gdf.to_crs(crs)
 
         data = src.read(1)  # Read the first band
@@ -92,31 +92,31 @@ def shp_to_bm(tif, shp, output_folder):
 
     # Create a binary mask for each shape
     for idx, geom in gdf.geometry.items():
-                # Check if the shape intersects the TIF bounds
-                if geom.intersects(tif_bounds):
-                    # Create a mask with the same shape as the TIF data
-                    mask = np.zeros_like(data, dtype=np.uint8)
+        if geom is not None:  # Check if geom is not None
+            # Check if the shape intersects the TIF bounds
+            if geom.intersects(tif_bounds):
+                # Create a mask with the same shape as the TIF data
+                mask = np.zeros_like(data, dtype=np.uint8)
 
-                    # Create a shape for the form
-                    shapes = ((geom, 1),)
+                # Create a shape for the form
+                shapes = ((geom, 1),)
 
-                    # Create the mask
-                    mask = features.rasterize(
-                        shapes = shapes,
-                        out = mask,
-                        fill = 1,
-                        transform = transform,
-                        all_touched = True,
-                        default_value = 0
-                    )
+                # Create the mask
+                mask = features.rasterize(
+                    shapes=shapes,
+                    out=mask,
+                    fill=1,
+                    transform=transform,
+                    all_touched=True,
+                    default_value=0
+                )
 
-                    #print(output_folder)
-                    # Set the output path for the binary mask
-                    output_tif_path = f"{output_folder}/output_mask_{idx}.tif"
+                # Set the output path for the binary mask
+                output_tif_path = f"{output_folder}/output_mask_{idx}.tif"
 
-                    # Write the mask to a new TIF file
-                    with rasterio.open(output_tif_path, 'w', **profile) as dst:
-                        dst.write(mask, 1)
+                # Write the mask to a new TIF file
+                with rasterio.open(output_tif_path, 'w', **profile) as dst:
+                    dst.write(mask, 1)
 
 
 def create_binary_mask(shp_folder):

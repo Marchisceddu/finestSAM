@@ -35,7 +35,7 @@ config_train = {
         "weight_decay": 1e-4,
         "decay_factor": 10,
         "steps": None,
-        "warmup_steps": 30,
+        "warmup_steps": 250,
     },
 
     "losses": {
@@ -57,8 +57,8 @@ config_train = {
     "dataset": {
         "auto_split": True,
         "path": {
-            "root_dir": "../dataset2/images",
-            "annotation_file": "../dataset2/annotations.json"
+            "root_dir": "../dataset/images",
+            "annotation_file": "../dataset/annotations.json"
         },
         "train": {
             "root_dir": "../datasetCalcio",

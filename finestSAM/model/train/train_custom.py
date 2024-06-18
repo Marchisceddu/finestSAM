@@ -105,6 +105,8 @@ def train_custom(
 
             # Compute the losses
             for data, pred_masks, iou_predictions, logits in zip(batched_data, batched_pred_masks, batched_iou_predictions, batched_logits):
+                gt_mask = F.interpolate(data["mask_inputs"], data["original_size"], mode="bilinear", align_corners=False)
+                gt_mask = (gt_mask >= 0.5).float()
 
                 if cfg.multimask_output:
                     # Separa la tripla di maschere predette
@@ -121,22 +123,22 @@ def train_custom(
                 if cfg.prompts.use_logits: epoch_logits.append(logits)
 
                 # Aggiorna metriche
-                batch_iou = calc_iou(pred_masks, data["gt_masks"])
+                batch_iou = calc_iou(pred_masks, gt_mask)
                 iter_metrics["iou"] += torch.mean(batch_iou)
                 iter_metrics["iou_pred"] += torch.mean(iou_predictions)
 
                 # Calcola loss
-                iter_metrics["loss_focal"] += focal_loss(pred_masks, data["gt_masks"], len(pred_masks))
-                iter_metrics["loss_dice"] += dice_loss(pred_masks, data["gt_masks"], len(pred_masks))
+                iter_metrics["loss_focal"] += focal_loss(pred_masks, gt_mask, len(pred_masks))
+                iter_metrics["loss_dice"] += dice_loss(pred_masks, gt_mask, len(pred_masks))
                 iter_metrics["loss_iou"] += F.mse_loss(iou_predictions, batch_iou, reduction='mean')
 
                 # STAMPA DI DEBUG ELIMINARE
-                plt.imshow(data["original_image"])
-                for i, mask in enumerate(pred_masks > 0):
-                    show_mask(mask.clone().detach(), plt.gca(), seed=i)
-                plt.axis('off')
-                plt.savefig(os.path.join(cfg.out_dir, "p.png"))
-                plt.clf()
+                # plt.imshow(data["original_image"])
+                # for i, mask in enumerate(pred_masks > 0):
+                #     show_mask(mask.clone().detach(), plt.gca(), seed=i)
+                # plt.axis('off')
+                # plt.savefig(os.path.join(cfg.out_dir, "p.png"))
+                # plt.clf()
 
             loss_total = cfg.losses.focal_ratio * iter_metrics["loss_focal"] + cfg.losses.dice_ratio * iter_metrics["loss_dice"] + cfg.losses.iou_ratio * iter_metrics["loss_iou"]
 

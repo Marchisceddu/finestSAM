@@ -210,15 +210,17 @@ def get_collate_fn(cfg: Box):
                 if not cfg.prompts.use_masks:
                     resized_masks = None
 
+            import matplotlib.pyplot as plt
+            plt.imshow(original_image)
+            plt.show()
+
             batched_data.append({
                 "image": image,
-                "original_image": original_image,
                 "original_size": original_size,
                 "point_coords": point_coord,
                 "point_labels": point_label,
                 "boxes": boxes,
                 "mask_inputs": resized_masks,
-                "gt_masks": masks,
             })
 
         return batched_data
