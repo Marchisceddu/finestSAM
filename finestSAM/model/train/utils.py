@@ -224,7 +224,6 @@ def print_graphs(metrics: dict[list], out_plots: str):
         plt.title(metric_name.capitalize())
         plt.legend()
         plt.savefig(os.path.join(out_plots, f"{metric_name}.png"))
-        plt.show()
         plt.clf()
         
     for metric_name in metric_names:
@@ -240,7 +239,6 @@ def print_graphs(metrics: dict[list], out_plots: str):
 
     plt.legend(loc='upper left')
     plt.savefig(os.path.join(out_plots, "all_metrics.png"))
-    plt.show()
     plt.clf()
 
     plt.close('all')
