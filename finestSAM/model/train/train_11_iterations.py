@@ -1,3 +1,4 @@
+import os
 import time
 import torch
 import numpy as np
@@ -5,9 +6,11 @@ import lightning as L
 import torch.nn.functional as F
 from .utils import (
     AverageMeter,
+    Metrics,
     validate,
     save,
-    print_and_log_metrics
+    print_and_log_metrics,
+    print_graphs
 )
 from .losses import (
     CalcIoU,
@@ -43,13 +46,21 @@ def train_11_iterations(
     new_point_coords = []
     new_point_labels = []
 
+    val_score = 0.
+
+    out_plots = os.path.join(cfg.out_dir, "plots")
+    os.makedirs(out_plots, exist_ok=True)
+    metrics = {
+        "focal_loss": [],
+        "dice_loss": [],
+        "space_iou_loss": [],
+        "total_loss": [],
+        "iou": [],
+        "iou_pred": [],
+    }
+
     for epoch in range(1, cfg.num_epochs + 1):
-        batch_time = AverageMeter()
-        data_time = AverageMeter()
-        focal_losses = AverageMeter()
-        dice_losses = AverageMeter()
-        iou_losses = AverageMeter()
-        total_losses = AverageMeter()
+        epoch_metrics = Metrics()
         end = time.time()
 
         random_number = np.random.randint(2, 11)
@@ -60,7 +71,7 @@ def train_11_iterations(
             only_logits = True if iteration == random_number or iteration == 11 else False
 
             for iter, batched_data in enumerate(train_dataloader):
-                data_time.update(time.time() - end)
+                epoch_metrics.data_time.update(time.time()-end)
 
                 # After the first iteration, the model will receive the low_res_logits as input
                 if iteration > 1:
@@ -92,11 +103,15 @@ def train_11_iterations(
                     iou_predictions.append(item["iou_predictions"])
                     raw_logits.append(item["low_res_logits"])
 
-                num_masks = sum(len(pred_mask) for pred_mask in batched_pred_masks)
+                batch_size = len(batched_data)
 
-                loss_focal = torch.tensor(0., device=fabric.device)
-                loss_dice = torch.tensor(0., device=fabric.device)
-                loss_iou = torch.tensor(0., device=fabric.device)
+                iter_metrics = {
+                    "loss_focal": torch.tensor(0., device=fabric.device),
+                    "loss_dice": torch.tensor(0., device=fabric.device),
+                    "loss_iou": torch.tensor(0., device=fabric.device),
+                    "iou": torch.tensor(0., device=fabric.device),
+                    "iou_pred": torch.tensor(0., device=fabric.device),
+                }
 
                 for pred_masks, data, iou_prediction, logits in zip(batched_pred_masks, batched_data, iou_predictions, raw_logits):
 
@@ -116,30 +131,47 @@ def train_11_iterations(
                     new_point_labels.append(l)
 
                     batch_iou = iou_loss(pred_masks, data["gt_masks"])
-                    loss_focal += focal_loss(pred_masks, data["gt_masks"], num_masks)
-                    loss_dice += dice_loss(pred_masks, data["gt_masks"], num_masks)
-                    loss_iou += F.mse_loss(iou_prediction, batch_iou, reduction='mean')
+                    iter_metrics["iou"] += torch.mean(batch_iou)
+                    iter_metrics["iou_pred"] += torch.mean(iou_prediction)
+                    iter_metrics["loss_focal"] += focal_loss(pred_masks, data["gt_masks"], len(pred_masks))
+                    iter_metrics["loss_dice"] += dice_loss(pred_masks, data["gt_masks"], len(pred_masks))
+                    iter_metrics["loss_iou"] += F.mse_loss(iou_prediction, batch_iou, reduction='mean')
 
-                loss_total = cfg.losses.focal_ratio * loss_focal + cfg.losses.dice_ratio * loss_dice + loss_iou
+                loss_total = cfg.losses.focal_ratio * iter_metrics["loss_focal"] + cfg.losses.dice_ratio * iter_metrics["loss_dice"] + cfg.losses.iou_ratio * iter_metrics["loss_iou"]
 
                 optimizer.zero_grad()
                 fabric.backward(loss_total)
                 optimizer.step()
                 scheduler.step()
 
-                batch_time.update(time.time() - end)
+                epoch_metrics.batch_time.update(time.time() - end)
                 end = time.time()
 
-                focal_losses.update(loss_focal.item(), cfg.batch_size)
-                dice_losses.update(loss_dice.item(), cfg.batch_size)
-                iou_losses.update(loss_iou.item(), cfg.batch_size)
-                total_losses.update(loss_total.item(), cfg.batch_size)
-                best_score = torch.mean(iou_prediction)
+                epoch_metrics.focal_losses.update(iter_metrics["loss_focal"].item(), batch_size)
+                epoch_metrics.dice_losses.update(iter_metrics["loss_dice"].item(), batch_size)
+                epoch_metrics.space_iou_losses.update(iter_metrics["loss_iou"].item(), batch_size)
+                epoch_metrics.total_losses.update(loss_total.item(), batch_size)
+                epoch_metrics.ious.update(iter_metrics["iou"].item()/batch_size, batch_size)
+                epoch_metrics.ious_pred.update(iter_metrics["iou_pred"].item()/batch_size, batch_size)
 
-                print_and_log_metrics(fabric, cfg, epoch, iter, batch_time, data_time, focal_losses, dice_losses, iou_losses, total_losses, best_score, train_dataloader)
+                print_and_log_metrics(fabric, cfg, epoch, iter, epoch_metrics, train_dataloader)
 
-        if (epoch > 1 and cfg.eval_interval > 0 and epoch % cfg.eval_interval == 0) or (epoch == cfg.num_epochs):
-            validate(fabric, cfg, model, train_dataloader, epoch)
+        if (cfg.eval_interval > 0 and epoch % cfg.eval_interval == 0) or (epoch == cfg.num_epochs):
+            val_score = validate(fabric, cfg, model, val_dataloader, epoch, val_score)
+            #save(fabric, model, cfg.sav_dir, "c")
+        
+        if epoch % 50 == 0:
+            save(fabric, model, cfg.sav_dir, f"{epoch}")
+
+        # Aggiorna le metriche per i plot
+        metrics["dice_loss"].append(epoch_metrics.dice_losses.avg)
+        metrics["focal_loss"].append(epoch_metrics.focal_losses.avg)
+        metrics["space_iou_loss"].append(epoch_metrics.space_iou_losses.avg)
+        metrics["total_loss"].append(epoch_metrics.total_losses.avg)
+        metrics["iou"].append(epoch_metrics.ious.avg)
+        metrics["iou_pred"].append(epoch_metrics.ious_pred.avg)
+
+        print_graphs(metrics, out_plots)
 
 
 def calc_points_train(

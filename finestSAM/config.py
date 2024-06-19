@@ -14,17 +14,16 @@ config = {
 }
 
 config_train = {
-    "seed_dataloader": 42,
-    "batch_size": 1,
+    "seed_dataloader": None,
+    "batch_size": 2,
     "num_workers": 0,
 
-    "train_type": "custom",
     "num_epochs": 100,
     "eval_interval": 10,
     "eval_improvement": 0.,
     "prompts": {
-        "use_boxes": False,
-        "use_points": True,
+        "use_boxes": True,
+        "use_points": False,
         "use_masks": False,
         "use_logits": False,
     },
@@ -35,7 +34,7 @@ config_train = {
         "weight_decay": 1e-4,
         "decay_factor": 10,
         "steps": None,
-        "warmup_steps": 250,
+        "warmup_steps": 100,
     },
 
     "losses": {
@@ -56,6 +55,7 @@ config_train = {
 
     "dataset": {
         "auto_split": True,
+        "seed_split": 42,
         "path": {
             "root_dir": "../dataset/images",
             "annotation_file": "../dataset/annotations.json"

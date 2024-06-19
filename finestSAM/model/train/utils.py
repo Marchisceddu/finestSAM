@@ -49,18 +49,19 @@ class Metrics:
 
 def configure_opt(cfg: Box, model: FinestSAM) -> Tuple[_FabricOptimizer, _FabricOptimizer]:
 
-    def lr_lambda(step):
-        if step < cfg.opt.warmup_steps:
-            return step / cfg.opt.warmup_steps
-        elif cfg.opt.steps == None or step < cfg.opt.steps[0]:
-            return 1.0
-        elif step < cfg.opt.steps[1]:
-            return 1 / cfg.opt.decay_factor
-        else:
-            return 1 / (cfg.opt.decay_factor**2)
+    # def lr_lambda(step):
+    #     if step < cfg.opt.warmup_steps:
+    #         return step / cfg.opt.warmup_steps
+    #     elif cfg.opt.steps == None or step < cfg.opt.steps[0]:
+    #         return 1.0
+    #     elif step < cfg.opt.steps[1]:
+    #         return 1 / cfg.opt.decay_factor
+    #     else:
+    #         return 1 / (cfg.opt.decay_factor**2)
 
     optimizer = torch.optim.Adam(model.model.parameters(), lr=cfg.opt.learning_rate, weight_decay=cfg.opt.weight_decay)
-    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
+    #scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, verbose=True)
 
     return optimizer, scheduler
 
@@ -222,22 +223,22 @@ def print_graphs(metrics: dict[list], out_plots: str):
     for metric_name in metric_names:
         plt.plot(metrics[metric_name], label=metric_name.capitalize())
         plt.title(metric_name.capitalize())
-        plt.legend()
         plt.savefig(os.path.join(out_plots, f"{metric_name}.png"))
         plt.clf()
         
     for metric_name in metric_names:
-        plt.plot(metrics[metric_name], label=metric_name.capitalize())
+        if metric_name != "total_loss":
+            plt.plot(metrics[metric_name], label=metric_name.capitalize())
     plt.title("All Metrics")
     plt.xlabel('Epoch')
     plt.ylabel('Value')
-    plt.legend()
+    plt.legend(bbox_to_anchor=(0, 0.85), title='Left Axis')
 
     plt2 = plt.gca().twinx()
     plt2.plot(metrics["total_loss"], color='black', linestyle='--', label="Total Loss")
     plt2.set_ylabel('Total Loss')
 
-    plt.legend(loc='upper left')
+    plt.legend(bbox_to_anchor=(1, 0.85), title='Right Axis')
     plt.savefig(os.path.join(out_plots, "all_metrics.png"))
     plt.clf()
 

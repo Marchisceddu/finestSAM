@@ -194,34 +194,31 @@ class ResizeAndPad:
 
         return image, resized_masks, boxes, point_coords
 
-def get_collate_fn(cfg: Box):
+def get_collate_fn(cfg: Box, type):
     def collate_fn(batch: List[Tuple]):
         batched_data = []
 
         for data in batch:
             image, original_image, original_size, point_coord, point_label, boxes, masks, resized_masks = data
 
-            if cfg.train_type == "custom":
-                if not cfg.prompts.use_boxes:
-                    boxes = None
-                if not cfg.prompts.use_points:
-                    point_coord = None
-                    point_label = None
-                if not cfg.prompts.use_masks:
-                    resized_masks = None
-
-            import matplotlib.pyplot as plt
-            plt.imshow(original_image)
-            plt.show()
-
-            batched_data.append({
+            data = {
                 "image": image,
                 "original_size": original_size,
-                "point_coords": point_coord,
-                "point_labels": point_label,
-                "boxes": boxes,
-                "mask_inputs": resized_masks,
-            })
+                "gt_masks": masks,
+            }
+
+            if cfg.prompts.use_boxes:
+                data["boxes"] = boxes
+            if cfg.prompts.use_points:
+                data["point_coords"] = point_coord
+                data["point_labels"] = point_label
+            if cfg.prompts.use_masks:
+                data["mask_inputs"] = resized_masks
+
+            if type == "val":
+                data["original_image"] = original_image
+
+            batched_data.append(data)
 
         return batched_data
     
@@ -259,8 +256,8 @@ def load_dataset(cfg: Box, img_size: int) -> Tuple[DataLoader, DataLoader]:
 
         # Set the seed 
         generator = torch.Generator()
-        if cfg.seed_dataloader != None:
-            generator.manual_seed(cfg.seed_dataloader)
+        if cfg.dataset.seed_split != None:
+            generator.manual_seed(cfg.dataset.seed_split)
 
         # Split the dataset into training and validation
         train_data, val_data = random_split(data, [total_size - val_size, val_size], generator=generator)
@@ -286,12 +283,12 @@ def load_dataset(cfg: Box, img_size: int) -> Tuple[DataLoader, DataLoader]:
                                   batch_size=cfg.batch_size,
                                   shuffle=True,
                                   num_workers=cfg.num_workers,
-                                  collate_fn=get_collate_fn(cfg))
+                                  collate_fn=get_collate_fn(cfg, "train"))
 
     val_dataloader = DataLoader(val_data,
                                 batch_size=cfg.batch_size,
                                 shuffle=False,
                                 num_workers=cfg.num_workers,
-                                collate_fn=get_collate_fn(cfg))
+                                collate_fn=get_collate_fn(cfg, "val"))
 
     return train_dataloader, val_dataloader
