@@ -49,20 +49,30 @@ class Metrics:
 
 def configure_opt(cfg: Box, model: FinestSAM) -> Tuple[_FabricOptimizer, _FabricOptimizer]:
 
-    # def lr_lambda(step):
-    #     if step < cfg.opt.warmup_steps:
-    #         return step / cfg.opt.warmup_steps
-    #     elif cfg.opt.steps == None or step < cfg.opt.steps[0]:
-    #         return 1.0
-    #     elif step < cfg.opt.steps[1]:
-    #         return 1 / cfg.opt.decay_factor
-    #     else:
-    #         return 1 / (cfg.opt.decay_factor**2)
+    def lr_lambda(step):
+        step_list = cfg.sched.LambdaLR.steps
 
-    optimizer = torch.optim.Adam(model.model.parameters(), lr=cfg.opt.learning_rate, weight_decay=cfg.opt.weight_decay)
-    #scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, verbose=True)
+        if step < cfg.sched.LambdaLR.warmup_steps:
+            return step / cfg.sched.LambdaLR.warmup_steps
+        elif isinstance(step_list, list) and len(step_list) > 0 and all(isinstance(step, int) for step in step_list):
+            for mul_factor, steps in enumerate(step_list):
+                if step < steps:
+                    return 1 / (cfg.sched.LambdaLR.decay_factor ** (mul_factor+1))
+                
+        return 1.0
+    
+    optimizer = torch.optim.AdamW(model.model.parameters(), lr=cfg.opt.learning_rate, weight_decay=cfg.opt.weight_decay)
 
+    if cfg.sched.type == "ReduceLROnPlateau":
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, 
+                                                               factor=cfg.sched.ReduceLROnPlateau.decay_factor, 
+                                                               patience=cfg.sched.ReduceLROnPlateau.epoch_patience, 
+                                                               threshold=cfg.sched.ReduceLROnPlateau.threshold, 
+                                                               cooldown=cfg.sched.ReduceLROnPlateau.cooldown,
+                                                               min_lr=cfg.sched.ReduceLROnPlateau.min_lr)
+    else:
+        scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
+    
     return optimizer, scheduler
 
 
@@ -120,9 +130,9 @@ def validate(
             for data in batched_data:
                 predictor.set_image(data["original_image"])
                 masks, stability_scores, _  = predictor.predict_torch(
-                    point_coords=data["point_coords"],
-                    point_labels=data["point_labels"],
-                    boxes=data["boxes"],
+                    point_coords=data.get("point_coords", None),
+                    point_labels=data.get("point_labels", None),
+                    boxes=data.get("boxes", None),
                     multimask_output=cfg.multimask_output,
                 )
 
@@ -135,14 +145,14 @@ def validate(
                     pred_masks.append(separated_masks[torch.argmax(torch.tensor(stability_score))])
 
                     # STAMPA DI DEBUG ELIMINARE
-                    plt.imshow(data["original_image"])
-                    for i, mask in enumerate(separated_masks[torch.argmax(torch.tensor(stability_score))]):
-                        show_mask(mask, plt.gca(), seed=i)
-                    plt.axis('off')
-                    plt.savefig(os.path.join(cfg.out_dir, "m.png"))
-                    plt.show()
-                    plt.clf()
-                    plt.close('all')
+                    # plt.imshow(data["original_image"])
+                    # for i, mask in enumerate(separated_masks[torch.argmax(torch.tensor(stability_score))]):
+                    #     show_mask(mask, plt.gca(), seed=i)
+                    # plt.axis('off')
+                    # plt.savefig(os.path.join(cfg.out_dir, "m.png"))
+                    # plt.show()
+                    # plt.clf()
+                    # plt.close('all')
                 else:
                     pred_masks.append(masks)
 
@@ -196,17 +206,17 @@ def print_and_log_metrics(
     fabric.print(f'Epoch: [{epoch}][{iter+1}/{len(train_dataloader)}]'
                  f' | Time [{metrics.batch_time.val:.3f}s ({metrics.batch_time.avg:.3f}s)]'
                  f' | Data [{metrics.data_time.val:.3f}s ({metrics.data_time.avg:.3f}s)]'
-                 f' | Focal Loss [{metrics.focal_losses.val:.4f} ({metrics.focal_losses.avg:.4f})]'
-                 f' | Dice Loss [{metrics.dice_losses.val:.4f} ({metrics.dice_losses.avg:.4f})]'
-                 f' | Space IoU Loss [{metrics.space_iou_losses.val:.4f} ({metrics.space_iou_losses.avg:.4f})]'
+                 f' | Focal Loss [{cfg.losses.focal_ratio * metrics.focal_losses.val:.4f} ({cfg.losses.focal_ratio * metrics.focal_losses.avg:.4f})]'
+                 f' | Dice Loss [{cfg.losses.dice_ratio * metrics.dice_losses.val:.4f} ({cfg.losses.dice_ratio * metrics.dice_losses.avg:.4f})]'
+                 f' | Space IoU Loss [{cfg.losses.iou_ratio * metrics.space_iou_losses.val:.4f} ({cfg.losses.iou_ratio * metrics.space_iou_losses.avg:.4f})]'
                  f' | Total Loss [{metrics.total_losses.val:.4f} ({metrics.total_losses.avg:.4f})]'
                  f' | IoU [{metrics.ious.val:.4f} ({metrics.ious.avg:.4f})]'
                  f' | Pred IoU [{metrics.ious_pred.val:.4f} ({metrics.ious_pred.avg:.4f})]')
     steps = epoch * len(train_dataloader) + iter
     log_info = {
         'total loss': metrics.total_losses.val,
-        'focal loss': metrics.focal_losses.val,
-        'dice loss':  metrics.dice_losses.val,
+        'focal loss': cfg.losses.focal_ratio * metrics.focal_losses.val,
+        'dice loss':  cfg.losses.dice_ratio * metrics.dice_losses.val,
     }
     fabric.log_dict(log_info, step=steps)
 
@@ -221,25 +231,27 @@ def print_graphs(metrics: dict[list], out_plots: str):
     metric_names = ["dice_loss", "focal_loss", "space_iou_loss", "total_loss", "iou", "iou_pred"]
 
     for metric_name in metric_names:
+        plt.figure(figsize=(10, 6))
         plt.plot(metrics[metric_name], label=metric_name.capitalize())
         plt.title(metric_name.capitalize())
         plt.savefig(os.path.join(out_plots, f"{metric_name}.png"))
         plt.clf()
-        
+      
+    plt.figure(figsize=(10, 6))
+
     for metric_name in metric_names:
         if metric_name != "total_loss":
             plt.plot(metrics[metric_name], label=metric_name.capitalize())
     plt.title("All Metrics")
     plt.xlabel('Epoch')
     plt.ylabel('Value')
-    plt.legend(bbox_to_anchor=(0, 0.85), title='Left Axis')
+    plt.legend(bbox_to_anchor=(1.28, 1), title='Left Axis')
 
     plt2 = plt.gca().twinx()
     plt2.plot(metrics["total_loss"], color='black', linestyle='--', label="Total Loss")
     plt2.set_ylabel('Total Loss')
+    plt.legend(bbox_to_anchor=(1.28, 0.7), title='Right Axis')
 
-    plt.legend(bbox_to_anchor=(1, 0.85), title='Right Axis')
-    plt.savefig(os.path.join(out_plots, "all_metrics.png"))
+    plt.savefig(os.path.join(out_plots, "all_metrics.png"), bbox_inches='tight')
     plt.clf()
-
     plt.close('all')

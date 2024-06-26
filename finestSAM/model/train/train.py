@@ -2,7 +2,7 @@ import os
 from .train_custom import train_custom
 from .train_11_iterations import train_11_iterations
 from .utils import configure_opt
-from ..dataset import load_dataset
+from ..dataset4 import load_dataset
 from ..utils import set_model
 from box import Box
 

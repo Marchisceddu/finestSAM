@@ -1,9 +1,11 @@
 import os
 import cv2
 import torch
+import random
 import numpy as np
 import torchvision.transforms as transforms
 import torch.nn.functional as F
+from scipy.spatial import Voronoi # INSTALLARE e aggiungere ai requirments
 from typing import Tuple, List
 from box import Box
 from pycocotools.coco import COCO
@@ -14,6 +16,7 @@ from torch.utils.data import (
     random_split
 )
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 
 class COCODataset(Dataset):
 
@@ -83,7 +86,8 @@ class COCODataset(Dataset):
         point_labels = []
         masks = []
 
-        # Get box, point and mask for any annotation
+        # Get box, point and mask for any annotations
+        print("get-items")
         for ann in anns:
             # Get the bounding box
             x, y, w, h = ann['bbox']
@@ -94,7 +98,7 @@ class COCODataset(Dataset):
             w = min(W - x, int(w + np.random.normal(0, 0.1 * w)))
             h = min(H - y, int(h + np.random.normal(0, 0.1 * h)))
 
-            # check if the new box is contained in the image 
+            # Check if the new box is contained in the image 
             if x + w > W:
                 w = W - x
             if y + h > H:
@@ -110,13 +114,20 @@ class COCODataset(Dataset):
             # Get the points for the mask
             list_point_0 = []
             list_point_1 = []
+            calc_i = []
+            calc_j = []
             for j in range(y, y + h):
                 for i in range(x, x + w):
                     if i >= 0 and i < len(mask[0]) and j >= 0 and j < len(mask):
                         if mask[j][i]:
                             list_point_1.append([i, j])
+                            if i not in calc_i: calc_i.append(i)
+                            if j not in calc_j : calc_j.append(j)
                         else:
                             list_point_0.append([i, j])
+
+            n_pos = self.cfg.dataset.positive_points
+            n_neg = self.cfg.dataset.negative_points
 
             """
             During the conversion of the resolution of the mask, some details can be lost, 
@@ -124,21 +135,39 @@ class COCODataset(Dataset):
             So, we need to filter out those annotations and keep only the ones that at least
             have the points that are needed for the training.  
             """
-            if len(list_point_1) >= self.cfg.dataset.positive_points and len(list_point_0) >= self.cfg.dataset.negative_points: 
+            if len(list_point_1) >= n_pos and len(list_point_0) >= n_neg and len(calc_j) > 1 and len(calc_i) > 1: 
                 masks.append(mask)
                 boxes.append([x, y, x + w, y + h])
-
+                
+                if n_pos > 0 and self.cfg.dataset.use_center:
+                    # implemente Centroidal Voronoi Tessellation (CVT)
+                    # Questo approccio sfrutta i concetti di centroidi Voronoi per determinare il punto più centrale all'interno della maschera binaria.
+                    vor = Voronoi(list_point_1) # Calcola i diagrammi di Voronoi utilizzando i punti forniti. I punti di Voronoi sono i centroidi dei poligoni di Voronoi, che corrispondono ai punti più centrali rispetto ai punti di campionamento.
+                    center_of_mass = vor.points[np.argsort(np.linalg.norm(vor.points - vor.points.mean(axis=0), axis=1))][0] # Trova il punto più centrale, che corrisponde al generatore del diagramma Voronoi
+                    n_pos = n_pos-1 if n_pos > 1 else 0
+                
                 temp_list_point = []
-                for i in range(0, self.cfg.dataset.positive_points):
+                for i in range(0, n_pos):
                     idx = np.random.randint(0, len(list_point_1))
                     temp_list_point.append(list_point_1[idx])
                 list_point_1 = temp_list_point.copy()
 
+                if 'center_of_mass' in locals(): list_point_1.append(center_of_mass)
+
                 temp_list_point = []
-                for i in range(0, self.cfg.dataset.negative_points):
+                for i in range(0, n_neg):
                     idx = np.random.randint(0, len(list_point_0))
                     temp_list_point.append(list_point_0[idx])
                 list_point_0 = temp_list_point.copy()
+
+                # ELIMINARE
+                fig, ax = plt.subplots()
+                ax.imshow(original_image)
+                for p in list_point_1:
+                   circle = patches.Circle(p, radius=10, color='g')
+                   ax.add_patch(circle)
+                plt.axis('off')
+                plt.show()
 
                 list_label_0 = [0] * len(list_point_0)
                 list_label_1 = [1] * len(list_point_1)
@@ -146,12 +175,6 @@ class COCODataset(Dataset):
                 point_coords.append(list_point_1 + list_point_0)
                 point_labels.append(list_label_1 + list_label_0)
     
-        if len(point_coords) == 0:
-            print("non ci sono punti")
-            plt.imshow(original_image)
-            plt.axis('off')
-            plt.savefig("immagine_errore.png")
-
         if self.transform:
             image, resized_masks, boxes, point_coords = self.transform(image, masks, np.array(boxes), np.array(point_coords))
 

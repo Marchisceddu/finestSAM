@@ -19,6 +19,8 @@ if __name__ == "__main__":
 
         predict_args = None
 
+    # scrivere una funzione check per il file cfg
+
     # Execute the selected mode 
     switcher = {
         "train": train,

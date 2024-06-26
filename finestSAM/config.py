@@ -15,15 +15,15 @@ config = {
 
 config_train = {
     "seed_dataloader": None,
-    "batch_size": 2,
+    "batch_size": 1,
     "num_workers": 0,
 
-    "num_epochs": 100,
+    "num_epochs": 300,
     "eval_interval": 10,
     "eval_improvement": 0.,
     "prompts": {
-        "use_boxes": True,
-        "use_points": False,
+        "use_boxes": False,
+        "use_points": True,
         "use_masks": False,
         "use_logits": False,
     },
@@ -32,9 +32,22 @@ config_train = {
     "opt": {
         "learning_rate": 8e-4,
         "weight_decay": 1e-4,
-        "decay_factor": 10,
-        "steps": None,
-        "warmup_steps": 100,
+    },
+
+    "sched": {
+        "type": "ReduceLROnPlateau", #"ReduceLROnPlateau" LambdaLR
+        "LambdaLR": {
+            "decay_factor": 10, # 1 / (cfg.sched.LambdaLR.decay_factor ** (mul_factor+1))
+            "steps": None, # il primo step dev'essere maggiore di warmup_steps, stemps = list[int]
+            "warmup_steps": 0,
+        },
+        "ReduceLROnPlateau": {
+            "decay_factor": 0.05, #lr * factor -> 8e-4 * 0.1 = 8e-5
+            "epoch_patience": 10,
+            "threshold": 1e-4,
+            "cooldown": 0,
+            "min_lr": 0,
+        },
     },
 
     "losses": {
@@ -71,11 +84,13 @@ config_train = {
         "val_size": 0.2,
         "positive_points": 1,
         "negative_points": 0,
+        "use_center": True, # il primo punto positivo sarà sempre il centro di massa
     }
 }
 
 config_predict = {
     "approx_accuracy": 0.01,
+    # inserire la trasparenza delle maschere da disegnare sopra
 }
 
 cfg_train = Box(config)

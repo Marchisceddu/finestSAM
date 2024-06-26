@@ -58,6 +58,7 @@ def train_custom(
     epoch_logits = []
 
     val_score = 0.
+    last_lr = scheduler.get_last_lr()
 
     out_plots = os.path.join(cfg.out_dir, "plots")
     os.makedirs(out_plots, exist_ok=True)
@@ -135,7 +136,8 @@ def train_custom(
                 # for i, mask in enumerate(pred_masks > 0):
                 #     show_mask(mask.clone().detach(), plt.gca(), seed=i)
                 # plt.axis('off')
-                # plt.savefig(os.path.join(cfg.out_dir, "p.png"))
+                # #plt.savefig(os.path.join(cfg.out_dir, "p.png"))
+                # plt.show()
                 # plt.clf()
 
             loss_total = cfg.losses.focal_ratio * iter_metrics["loss_focal"] + cfg.losses.dice_ratio * iter_metrics["loss_dice"] + cfg.losses.iou_ratio * iter_metrics["loss_iou"]
@@ -144,7 +146,6 @@ def train_custom(
             optimizer.zero_grad()
             fabric.backward(loss_total)
             optimizer.step()
-            scheduler.step()
 
             epoch_metrics.batch_time.update(time.time() - end)
             end = time.time()
@@ -159,6 +160,11 @@ def train_custom(
 
             print_and_log_metrics(fabric, cfg, epoch, iter, epoch_metrics, train_dataloader)
 
+        scheduler.step(epoch_metrics.total_losses.avg)
+        if scheduler.get_last_lr() != last_lr:
+            last_lr = scheduler.get_last_lr()
+            print(f"learning rate changed to: {last_lr}")
+
         # Validate the model
         if (cfg.eval_interval > 0 and epoch % cfg.eval_interval == 0) or (epoch == cfg.num_epochs):
             val_score = validate(fabric, cfg, model, val_dataloader, epoch, val_score)
@@ -168,9 +174,9 @@ def train_custom(
             save(fabric, model, cfg.sav_dir, f"{epoch}")
 
         # Aggiorna le metriche per i plot
-        metrics["dice_loss"].append(epoch_metrics.dice_losses.avg)
-        metrics["focal_loss"].append(epoch_metrics.focal_losses.avg)
-        metrics["space_iou_loss"].append(epoch_metrics.space_iou_losses.avg)
+        metrics["dice_loss"].append(cfg.losses.dice_ratio * epoch_metrics.dice_losses.avg)
+        metrics["focal_loss"].append(cfg.losses.focal_ratio * epoch_metrics.focal_losses.avg)
+        metrics["space_iou_loss"].append(cfg.losses.iou_ratio * epoch_metrics.space_iou_losses.avg)
         metrics["total_loss"].append(epoch_metrics.total_losses.avg)
         metrics["iou"].append(epoch_metrics.ious.avg)
         metrics["iou_pred"].append(epoch_metrics.ious_pred.avg)
