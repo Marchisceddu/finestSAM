@@ -9,6 +9,7 @@ python-box
 rasterio
 segmentation-models-pytorch
 shapely
+scipy
 torch
 torchvision
 tqdm

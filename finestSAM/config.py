@@ -46,7 +46,7 @@ config_train = {
             "epoch_patience": 10,
             "threshold": 1e-4,
             "cooldown": 0,
-            "min_lr": 0,
+            "min_lr": 2.0000000000000003e-06, # fa fare massimo 2 abbassate di lr
         },
     },
 
@@ -84,7 +84,7 @@ config_train = {
         "val_size": 0.2,
         "positive_points": 1,
         "negative_points": 0,
-        "use_center": True, # il primo punto positivo sarà sempre il centro di massa
+        "use_center": False, # il primo punto positivo sarà sempre il centro di massa
     }
 }
 

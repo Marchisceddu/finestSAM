@@ -1,11 +1,12 @@
 import os
 import cv2
+import tqdm
 import torch
 import random
 import numpy as np
 import torchvision.transforms as transforms
 import torch.nn.functional as F
-from scipy.spatial import Voronoi # INSTALLARE e aggiungere ai requirments
+from scipy.spatial import Voronoi
 from typing import Tuple, List
 from box import Box
 from pycocotools.coco import COCO
@@ -15,9 +16,10 @@ from torch.utils.data import (
     DataLoader,
     random_split
 )
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
-import tqdm
+
+import matplotlib.pyplot as plt # ELIMNINRE
+import matplotlib.patches as patches # ELIMINARE
+
 
 class COCODataset(Dataset):
 
@@ -51,7 +53,8 @@ class COCODataset(Dataset):
         self.points_1 = []
         self.points_0 = []
         self.masks = []
-        self.annIsValid = []
+        self.boxes = []
+        self.ann_valid = []
         if self.cfg.dataset.use_center:
             self.centroids = []
         
@@ -63,7 +66,7 @@ class COCODataset(Dataset):
 
             centroids = []
             masks = []
-            annIsValid = []
+            ann_valid = []
             points_0 = []
             points_1 = []
 
@@ -76,23 +79,17 @@ class COCODataset(Dataset):
                 masks.append(mask)
                 
                 # Get the points for the mask
-                list_points_0 = []
-                list_points_1 = []
-                for j in range(y, y + h):
-                    for i in range(x, x + w):
-                        if i >= 0 and i < len(mask[0]) and j >= 0 and j < len(mask):
-                            if mask[j][i]:
-                                list_points_1.append([i, j])
-                            else:
-                                list_points_0.append([i, j])
+                roi = mask[y:y + h, x:x + w] # Remove if you don't want the negative points only within the box.
+                list_points_1, list_points_0 = ([(px + x, py + y) for py, px in zip(*np.where(roi == v))] for v in [1, 0])
+                # list_points_1 = [(px + x, py + y) for py, px in zip(*np.where(roi == 1))]
+                # list_points_0 = [(px + x, py + y) for py, px in zip(*np.where(roi == 0))]
                 
                 points_1.append(list_points_1)
                 points_0.append(list_points_0)
 
-                isValid = False
+                is_valid = False
                 if self.cfg.dataset.use_center: center_of_mass = None
-                n_pos = self.cfg.dataset.positive_points
-                n_neg = self.cfg.dataset.negative_points
+                n_pos, n_neg = (self.cfg.dataset.positive_points, self.cfg.dataset.negative_points)
 
                 """
                 During the conversion of the resolution of the mask, some details can be lost, 
@@ -101,7 +98,7 @@ class COCODataset(Dataset):
                 have the points that are needed for the training.
                 """
                 if len(list_points_1) >= n_pos and len(list_points_0) >= n_neg: 
-                    isValid = True
+                    is_valid = True
                     if n_pos > 0 and self.cfg.dataset.use_center:
                         # implemente Centroidal Voronoi Tessellation (CVT)
                         # Questo approccio sfrutta i concetti di centroidi Voronoi per determinare il punto più centrale all'interno della maschera binaria.
@@ -109,15 +106,16 @@ class COCODataset(Dataset):
                             vor = Voronoi(list_points_1) # Calcola i diagrammi di Voronoi utilizzando i punti forniti. I punti di Voronoi sono i centroidi dei poligoni di Voronoi, che corrispondono ai punti più centrali rispetto ai punti di campionamento.
                             center_of_mass = vor.points[np.argsort(np.linalg.norm(vor.points - vor.points.mean(axis=0), axis=1))][0] # Trova il punto più centrale, che corrisponde al generatore del diagramma Voronoi
                         except Exception as e:
-                            isValid = False
+                            print(e)
+                            is_valid = False
                 
-                annIsValid.append(isValid)
+                ann_valid.append(is_valid)
                 if self.cfg.dataset.use_center: centroids.append(center_of_mass)   
         
             # Append the data for the image
             self.points_1.append(points_1)
             self.points_0.append(points_0)
-            self.annIsValid.append(annIsValid)
+            self.ann_valid.append(ann_valid)
             self.masks.append(masks)
             if self.cfg.dataset.use_center: self.centroids.append(centroids)
 
@@ -141,7 +139,8 @@ class COCODataset(Dataset):
                 the masks, 
                 the resized masks, 
         """
-       # Set the seed for reproducibility
+        # Set the seed for reproducibility
+        random.seed(self.seed)
         np.random.seed(self.seed)
 
         # Restor the image from the folder
@@ -175,25 +174,35 @@ class COCODataset(Dataset):
             h = min(H - y, int(h + np.random.normal(0, 0.1 * h)))
 
             # Check if the new box is contained in the image 
-            if x + w > W:
-                w = W - x
-            if y + h > H:
-                h = H - y
-            if x < 0:
-                x = 0
-            if y < 0:
-                y = 0
+            x = max(0, x)
+            y = max(0, y)
+            w = min(w, W - x)
+            h = min(h, H - y)
+            # if x + w > W:
+            #     w = W - x
+            # if y + h > H:
+            #     h = H - y
+            # if x < 0:
+            #     x = 0
+            # if y < 0:
+            #     y = 0
+
+            fig, ax = plt.subplots()
+            ax.imshow(original_image)
+            rect = patches.Rectangle((x, y), w, h, linewidth=2, edgecolor='r', facecolor='none')
+            ax.add_patch(rect)
+            plt.axis('off')
+            plt.show()
 
             # Get the masks
             mask = self.masks[idx][i].copy()
 
-            list_point_1 = self.points_1[idx][i].copy()
-            list_point_0 = self.points_0[idx][i].copy()
+            points_1 = self.points_1[idx][i].copy()
+            points_0 = self.points_0[idx][i].copy()
 
-            n_pos = self.cfg.dataset.positive_points
-            n_neg = self.cfg.dataset.negative_points
-
-            if self.annIsValid[idx][i]: 
+            n_pos, n_neg = (self.cfg.dataset.positive_points, self.cfg.dataset.negative_points)
+            
+            if self.ann_valid[idx][i]: 
                 masks.append(mask)
                 boxes.append([x, y, x + w, y + h])
                 
@@ -201,31 +210,21 @@ class COCODataset(Dataset):
                     center_of_mass = self.centroids[idx][i].copy()
                     n_pos = n_pos-1 if n_pos > 1 else 0
                 
-                temp_list_point = []
-                for _ in range(0, n_pos):
-                    pos = np.random.randint(0, len(list_point_1))
-                    temp_list_point.append(list_point_1[pos])
-                list_point_1 = temp_list_point.copy()
+                points_1, points_0 = (random.sample(points, n_points) for points, n_points in zip([points_1, points_0], [n_pos, n_neg]))
+                if 'center_of_mass' in locals(): points_1.append(center_of_mass)
 
-                if 'center_of_mass' in locals(): list_point_1.append(center_of_mass)
+                label_1, label_0 = ([v] * len(points) for points, v in zip([points_1, points_0], [1, 0]))
+                #label_0 = [0] * len(points_0)
+                print(label_1, label_0)
 
-                temp_list_point = []
-                for _ in range(0, n_neg):
-                    pos = np.random.randint(0, len(list_point_0))
-                    temp_list_point.append(list_point_0[pos])
-                list_point_0 = temp_list_point.copy()
-
-                list_label_0 = [0] * len(list_point_0)
-                list_label_1 = [1] * len(list_point_1)
-
-                point_coords.append(list_point_1 + list_point_0)
-                point_labels.append(list_label_1 + list_label_0)
+                point_coords.append(points_1 + points_0)
+                point_labels.append(label_1 + label_0)
 
                 # fig, ax = plt.subplots()
                 # ax.imshow(original_image)
                 # for p in list_point_1:
-                #    circle = patches.Circle(p, radius=10, color='g')
-                #    ax.add_patch(circle)
+                #     circle = patches.Circle(p, radius=10, color='g')
+                #     ax.add_patch(circle)
                 # plt.axis('off')
                 # plt.show()
     
@@ -276,6 +275,7 @@ class ResizeAndPad:
         point_coords = self.transform.apply_coords(point_coords, (og_h, og_w))
 
         return image, resized_masks, boxes, point_coords
+
 
 def get_collate_fn(cfg: Box, type):
     def collate_fn(batch: List[Tuple]):

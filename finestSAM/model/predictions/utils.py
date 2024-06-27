@@ -24,11 +24,12 @@ def show_anns(anns, opacity=0.35):
 def show_mask(mask, ax, random_color=True, seed=None):
     np.random.seed(seed)
     if random_color:
-        color = np.concatenate([np.random.random(3), np.array([1])], axis=0)
+        color = np.concatenate([np.random.random(3), np.array([0.8])], axis=0)
     else:
         color = np.array([30/255, 144/255, 255/255, 0.6])
     h, w = mask.shape[-2:]
-    mask_image = mask.cpu().numpy().reshape(h, w, 1) * color.reshape(1, 1, -1)
+    #mask_image = mask.cpu().numpy().reshape(h, w, 1) * color.reshape(1, 1, -1) for predictor
+    mask_image = mask.reshape(h, w, 1) * color.reshape(1, 1, -1)
     ax.imshow(mask_image)
     
 def show_points(coords, labels, ax, marker_size=375):
