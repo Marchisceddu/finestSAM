@@ -1,2 +1,2 @@
-from .train.train import train
+from .train.train import call_train
 from .predictions.predictor import automatic_predictions

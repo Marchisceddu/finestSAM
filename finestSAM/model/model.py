@@ -137,6 +137,10 @@ class FinestSAM(nn.Module):
     def get_automatic_predictor(
             self, 
             min_mask_region_area: int = 0
-        ): # aggiungere altre paramentri per modificare
+        ):
         return SamAutomaticMaskGenerator(model=self.model, 
+                                         pred_iou_thresh = 0.4,
+                                         stability_score_thresh = 0.8,
+                                         stability_score_offset = 0,
+                                         box_nms_thresh = 0.4,
                                          min_mask_region_area=min_mask_region_area)

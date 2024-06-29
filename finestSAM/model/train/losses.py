@@ -143,7 +143,7 @@ class CalcIoU(nn.Module):
                     classification label for each element in inputs
                     (0 for the negative class and 1 for the positive class).
         """
-        inputs = (inputs > 0).float()
+        inputs = (inputs > 0.8).float() # INSERIRE VARIABILE COMUNE A VALIDATION
 
         inputs = inputs.flatten(1)
         targets = targets.flatten(1)

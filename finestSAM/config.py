@@ -3,6 +3,7 @@ from box import Box
 config = {
     "device": "auto",
     "num_devices": "auto",
+    "num_nodes": 1, # Numero di nodi GPU per l'addestramento distribuito
     "seed_device": 1337,
     "sav_dir": "sav",
     "out_dir": "out",
@@ -18,7 +19,7 @@ config_train = {
     "batch_size": 1,
     "num_workers": 0,
 
-    "num_epochs": 300,
+    "num_epochs": 500,
     "eval_interval": 10,
     "eval_improvement": 0.,
     "prompts": {
@@ -43,7 +44,7 @@ config_train = {
         },
         "ReduceLROnPlateau": {
             "decay_factor": 0.05, #lr * factor -> 8e-4 * 0.1 = 8e-5
-            "epoch_patience": 10,
+            "epoch_patience": 15,
             "threshold": 1e-4,
             "cooldown": 0,
             "min_lr": 2.0000000000000003e-06, # fa fare massimo 2 abbassate di lr
@@ -68,23 +69,31 @@ config_train = {
 
     "dataset": {
         "auto_split": True,
-        "seed_split": 42,
-        "path": {
-            "root_dir": "../dataset/images",
-            "annotation_file": "../dataset/annotations.json"
+        "seed": 42,
+        "split_path": {
+            "root_dir": "../dataset",
+            "images_dir": "images",
+            "annotation_file": "annotations.json",
+            "sav": "sav.pth",
+            "val_size": 0.2,
         },
-        "train": {
-            "root_dir": "../datasetCalcio",
-            "annotation_file": "../datasetCalcio/annotations.json"
+        "no_split_path": {
+            "train": {
+                "root_dir": "../dataset/train",
+                "images_dir": "images",
+                "annotation_file": "annotations.json",
+                "sav": "sav.pth"
+            },
+            "val": {
+                "root_dir": "../dataset/val",
+                "images_dir": "images",
+                "annotation_file": "annotations.json",
+                "sav": "sav.pth"
+            },
         },
-        "val": {
-            "root_dir": "../datasetC/val",
-            "annotation_file": "../datasetC/val/annotations.json"
-        },
-        "val_size": 0.2,
-        "positive_points": 1,
-        "negative_points": 0,
-        "use_center": False, # il primo punto positivo sarà sempre il centro di massa
+        "positive_points": 4,
+        "negative_points": 4,
+        "use_center": True, # il primo punto positivo sarà sempre il centro di massa
     }
 }
 

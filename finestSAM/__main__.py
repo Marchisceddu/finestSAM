@@ -1,5 +1,5 @@
 import argparse
-from model import train, automatic_predictions
+from model import call_train, automatic_predictions
 
 if __name__ == "__main__":
     # Parse the arguments
@@ -23,7 +23,7 @@ if __name__ == "__main__":
 
     # Execute the selected mode 
     switcher = {
-        "train": train,
+        "train": call_train,
         "predict": lambda cfg: automatic_predictions(cfg, predict_args.input, predict_args.approx_accuracy)
     }
     switcher[args.mode](cfg)

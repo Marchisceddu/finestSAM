@@ -14,7 +14,6 @@ from .utils import (
     show_points,
     show_box
 )
-from ..utils import set_model
 from ..model import FinestSAM
 from ..dataset import COCODataset
 
@@ -43,7 +42,17 @@ def automatic_predictions(
 
     # Load the model 
     with torch.no_grad():
-        model, _ = set_model(cfg)
+        fabric = L.Fabric(accelerator=cfg.device, # non è supportata la tpu, si può predirre solo con una singola gpu, impostare sotto il controllo
+                      devices=1,
+                      strategy="auto")
+        
+        fabric.seed_everything(cfg.seed_device)
+
+        with fabric.device:
+            model = FinestSAM(cfg)
+            model.setup()
+            model.eval()
+            model.to(fabric.device)
 
         # Predict the masks
         predictor = model.get_automatic_predictor(min_mask_region_area = 300)
@@ -89,6 +98,7 @@ def automatic_predictions(
     plt.close('all')
     print("Predizioni Salvate")
 
+    
 
 
 # Predittori manuali, da cambiare

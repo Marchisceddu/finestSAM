@@ -2,12 +2,13 @@ import os
 import torch
 import lightning as L
 import segmentation_models_pytorch as smp
-from ..model import FinestSAM
-from typing import Tuple
 from box import Box
-from lightning.fabric.fabric import _FabricOptimizer
+from typing import Tuple
 from torch.utils.data import DataLoader
+from lightning.fabric.fabric import _FabricOptimizer
+from ..model import FinestSAM
 
+# RIMUOVEREEEE
 from ..predictions.utils import (
     show_mask,
 )
@@ -163,7 +164,7 @@ def validate(
                     pred_mask,
                     gt_mask.int(),
                     mode='binary',
-                    threshold=0.5,
+                    threshold=0.5, # INSERIRE VARIABILE COMUNE A CALCIOU
                 )
                 batch_iou = smp.metrics.iou_score(*batch_stats, reduction="micro-imagewise")
                 ious.update(batch_iou, num_images)
@@ -220,6 +221,7 @@ def print_and_log_metrics(
     }
     fabric.log_dict(log_info, step=steps)
 
+
 def print_graphs(metrics: dict[list], out_plots: str):
     """
     Print the graphs for the metrics.
@@ -237,7 +239,7 @@ def print_graphs(metrics: dict[list], out_plots: str):
         plt.savefig(os.path.join(out_plots, f"{metric_name}.png"))
         plt.clf()
       
-    plt.figure(figsize=(10, 6))
+    plt.figure(figsize=(10, 6)) # FORSE FA AD AUMENTARE LA DIMENSIONE E DIVENTA PIU BELLINO
 
     for metric_name in metric_names:
         if metric_name != "total_loss":

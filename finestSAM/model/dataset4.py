@@ -5,7 +5,7 @@ import random
 import numpy as np
 import torchvision.transforms as transforms
 import torch.nn.functional as F
-from scipy.spatial import Voronoi
+from scipy.spatial import Voronoi # INSTALLARE e aggiungere ai requirments
 from typing import Tuple, List
 from box import Box
 from pycocotools.coco import COCO
@@ -56,7 +56,7 @@ class COCODataset(Dataset):
         self.isValid = []
         if self.cfg.dataset.use_center:
             self.centroids = []
-        
+
         bar = tqdm.tqdm(total = len(self.image_ids), desc = "Uploading dataset...", leave=False)
         for image_id in self.image_ids:
             ann_ids = self.coco.getAnnIds(imgIds=image_id)
@@ -76,11 +76,17 @@ class COCODataset(Dataset):
                 # Get the mask
                 mask = self.coco.annToMask(ann)
                 masks.append(mask)
-                
+
                 # Get the points for the mask
-                roi = mask[y:y + h, x:x + w] # Remove if you don't want the negative points only within the box.
-                list_point_1 = [(px + x, py + y) for py, px in zip(*np.where(roi == 1))]
-                list_point_0 = [(px + x, py + y) for py, px in zip(*np.where(roi == 0))]
+                list_point_0 = []
+                list_point_1 = []
+                for j in range(y, y + h):
+                    for i in range(x, x + w):
+                        if i >= 0 and i < len(mask[0]) and j >= 0 and j < len(mask):
+                            if mask[j][i]:
+                                list_point_1.append([i, j])
+                            else:
+                                list_point_0.append([i, j])
 
                 lists_point_1.append(list_point_1)
                 lists_point_0.append(list_point_0)
@@ -109,11 +115,13 @@ class COCODataset(Dataset):
                             centroids.append(np.array([0., 0.])) # NON LI USA, AUMENTA SOLO L'INDICE
                             isValid.append(False)
                     else:
+                        print("sono qui true")
                         isValid.append(True)
                 else:
+                    print("sono qui false")
                     if self.cfg.dataset.use_center: centroids.append(np.array([0., 0.]))
                     isValid.append(False)
-            
+
             self.lists_point_1.append(lists_point_1)
             self.lists_point_0.append(lists_point_0)
             self.isValid.append(isValid)
@@ -124,7 +132,7 @@ class COCODataset(Dataset):
 
     def __len__(self):
         return len(self.image_ids)
-    
+
     def __getitem__(self, idx: int) -> Tuple:
         """
         Args:
@@ -140,8 +148,7 @@ class COCODataset(Dataset):
                 the masks, 
                 the resized masks, 
         """
-        # Set the seed for reproducibility
-        random.seed(self.seed)
+       # Set the seed for reproducibility
         np.random.seed(self.seed)
 
         # Restor the image from the folder
@@ -202,17 +209,24 @@ class COCODataset(Dataset):
             if self.isValid[idx][i]: 
                 masks.append(mask)
                 boxes.append([x, y, x + w, y + h])
-                
+
                 if n_pos > 0 and self.cfg.dataset.use_center:
                     try:
                         center_of_mass = self.centroids[idx][i].copy()
-                        n_pos = n_pos-1 if n_pos > 1 else 0
                     except Exception as e:
-                        print(e)
+                        print(i)
 
-                list_point_1 = random.sample(list_point_1, n_pos)
+                        print(self.centroids[idx])
+
+                    n_pos = n_pos-1 if n_pos > 1 else 0
+
+                temp_list_point = []
+                for _ in range(0, n_pos):
+                    pos = np.random.randint(0, len(list_point_1))
+                    temp_list_point.append(list_point_1[pos])
+                list_point_1 = temp_list_point.copy()
+
                 if 'center_of_mass' in locals(): list_point_1.append(center_of_mass)
-                list_point_0 = random.sample(list_point_0, n_neg)
 
                 # fig, ax = plt.subplots()
                 # ax.imshow(original_image)
@@ -221,6 +235,12 @@ class COCODataset(Dataset):
                 #    ax.add_patch(circle)
                 # plt.axis('off')
                 # plt.show()
+
+                temp_list_point = []
+                for _ in range(0, n_neg):
+                    pos = np.random.randint(0, len(list_point_0))
+                    temp_list_point.append(list_point_0[pos])
+                list_point_0 = temp_list_point.copy()
 
                 list_label_0 = [0] * len(list_point_0)
                 list_label_1 = [1] * len(list_point_1)
@@ -232,8 +252,8 @@ class COCODataset(Dataset):
         # for i, mask in enumerate(masks):
         #     show_mask(mask, plt.gca(), seed=i)
         # plt.axis('off')
-        # plt.savefig(f"ooooo/{idx}.png")
-    
+        # plt.show()
+
         if self.transform:
             image, resized_masks, boxes, point_coords = self.transform(image, masks, np.array(boxes), np.array(point_coords))
 
@@ -246,9 +266,9 @@ class COCODataset(Dataset):
 
         # Add channel dimension to the masks for compatibility with the model
         resized_masks = resized_masks.unsqueeze(1)
-        
+
         return image, original_image, original_size, point_coords, point_labels, boxes, masks, resized_masks
-    
+
 
 class ResizeAndPad:
 
@@ -309,7 +329,7 @@ def get_collate_fn(cfg: Box, type):
             batched_data.append(data)
 
         return batched_data
-    
+
     return collate_fn
 
 
@@ -322,11 +342,6 @@ def load_dataset(cfg: Box, img_size: int) -> Tuple[DataLoader, DataLoader]:
     Returns:
         Tuple[DataLoader, DataLoader]: The training and validation dataloaders.
     """
-    # Set the seed 
-    generator = torch.Generator()
-    if cfg.dataset.seed_split != None:
-        generator.manual_seed(cfg.dataset.seed_split)
-
     # Set up the transformation for the dataset
     transform = ResizeAndPad(img_size)
 
@@ -342,10 +357,15 @@ def load_dataset(cfg: Box, img_size: int) -> Tuple[DataLoader, DataLoader]:
                         cfg=cfg,
                         transform=transform,
                         seed=cfg.seed_dataloader)
-        
+
          # Calc the size of the validation set
         total_size = len(data)
         val_size = int(total_size * cfg.dataset.val_size)
+
+        # Set the seed 
+        generator = torch.Generator()
+        if cfg.dataset.seed_split != None:
+            generator.manual_seed(cfg.dataset.seed_split)
 
         # Split the dataset into training and validation
         train_data, val_data = random_split(data, [total_size - val_size, val_size], generator=generator)
@@ -360,7 +380,7 @@ def load_dataset(cfg: Box, img_size: int) -> Tuple[DataLoader, DataLoader]:
                         cfg=cfg,
                         transform=transform,
                         seed=cfg.seed_dataloader)
-    
+
         val_data = COCODataset(root_dir=val_path,
                         annotation_file=val_annotations_path,
                         cfg=cfg,
@@ -370,14 +390,12 @@ def load_dataset(cfg: Box, img_size: int) -> Tuple[DataLoader, DataLoader]:
     train_dataloader = DataLoader(train_data,
                                   batch_size=cfg.batch_size,
                                   shuffle=True,
-                                  generator=generator,
                                   num_workers=cfg.num_workers,
                                   collate_fn=get_collate_fn(cfg, "train"))
 
     val_dataloader = DataLoader(val_data,
                                 batch_size=cfg.batch_size,
                                 shuffle=False,
-                                generator=generator,
                                 num_workers=cfg.num_workers,
                                 collate_fn=get_collate_fn(cfg, "val"))
 

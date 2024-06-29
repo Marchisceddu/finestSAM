@@ -38,10 +38,10 @@ class SamAutomaticMaskGenerator:
         model: Sam,
         points_per_side: Optional[int] = 32,
         points_per_batch: int = 64,
-        pred_iou_thresh: float = 0.8, # 0.3
-        stability_score_thresh: float = 0.9, #
+        pred_iou_thresh: float = 0.88,
+        stability_score_thresh: float = 0.95,
         stability_score_offset: float = 1.0,
-        box_nms_thresh: float = 0.7, # 0.3
+        box_nms_thresh: float = 0.7,
         crop_n_layers: int = 0,
         crop_nms_thresh: float = 0.7,
         crop_overlap_ratio: float = 512 / 1500,
