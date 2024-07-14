@@ -155,7 +155,7 @@ def validate(
                     # plt.clf()
                     # plt.close('all')
                 else:
-                    pred_masks.append(masks)
+                    pred_masks.append(masks.squeeze(1))
 
             gt_masks = [data["gt_masks"] for data in batched_data]  
             num_images = len(batched_data)

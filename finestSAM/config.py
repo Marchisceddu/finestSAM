@@ -9,8 +9,8 @@ config = {
     "out_dir": "out",
 
     "model": {
-        "type": 'vit_b',
-        "checkpoint": "sam_vit_b_01ec64.pth",
+        "type": 'vit_h',
+        "checkpoint": "sam_vit_h_4b8939.pth",
     },
 }
 
@@ -28,10 +28,10 @@ config_train = {
         "use_masks": False,
         "use_logits": False,
     },
-    "multimask_output": True,
+    "multimask_output": False,
 
     "opt": {
-        "learning_rate": 8e-4,
+        "learning_rate": 4e-5,
         "weight_decay": 1e-4,
     },
 
@@ -44,10 +44,10 @@ config_train = {
         },
         "ReduceLROnPlateau": {
             "decay_factor": 0.05, #lr * factor -> 8e-4 * 0.1 = 8e-5
-            "epoch_patience": 15,
+            "epoch_patience": 10,
             "threshold": 1e-4,
             "cooldown": 0,
-            "min_lr": 2.0000000000000003e-06, # fa fare massimo 2 abbassate di lr
+            "min_lr": 0, # fa fare massimo 2 abbassate di lr
         },
     },
 
@@ -68,10 +68,10 @@ config_train = {
     },
 
     "dataset": {
-        "auto_split": True,
+        "auto_split": False,
         "seed": 42,
         "split_path": {
-            "root_dir": "../dataset",
+            "root_dir": "../datasetVecchio",
             "images_dir": "images",
             "annotation_file": "annotations.json",
             "sav": "sav.pth",
@@ -91,8 +91,8 @@ config_train = {
                 "sav": "sav.pth"
             },
         },
-        "positive_points": 4,
-        "negative_points": 4,
+        "positive_points": 1,
+        "negative_points": 0,
         "use_center": True, # il primo punto positivo sarà sempre il centro di massa
     }
 }

@@ -22,7 +22,7 @@ from .losses import (
 )
 from ..model import FinestSAM
 from .utils import configure_opt
-from ..dataset5 import load_dataset
+from ..dataset6 import load_dataset
 
 
 def call_train(cfg: Box):
@@ -117,13 +117,15 @@ def train_loop(
         "iou": [],
         "iou_pred": [],
     }
-    
+
     for epoch in range(1, cfg.num_epochs+1):
         # Initialize the meters
         epoch_metrics = Metrics()
         end = time.time()
 
         for iter, batched_data in enumerate(train_dataloader):
+            torch.cuda.empty_cache()
+
             epoch_metrics.data_time.update(time.time()-end)
 
             # Se presenti e selezionati dalle impostazioni passa i logits dell'epoca precedente
@@ -165,6 +167,10 @@ def train_loop(
                     pred_masks = separated_masks[best_index]
                     iou_predictions = separated_scores[best_index]
                     logits = separated_logits[best_index]
+                else:
+                    pred_masks = pred_masks.squeeze(1)
+                    iou_predictions = iou_predictions.squeeze(1)
+                    logits = logits.squeeze(1)
 
                 if cfg.prompts.use_logits: epoch_logits.append(logits)
 
@@ -174,7 +180,7 @@ def train_loop(
                 iter_metrics["iou_pred"] += torch.mean(iou_predictions)
 
                 # Calcola loss
-                iter_metrics["loss_focal"] += focal_loss(pred_masks, data["gt_masks"], len(pred_masks))
+                iter_metrics["loss_focal"] += focal_loss(pred_masks, data["gt_masks"], len(pred_masks)) 
                 iter_metrics["loss_dice"] += dice_loss(pred_masks, data["gt_masks"], len(pred_masks))
                 iter_metrics["loss_iou"] += F.mse_loss(iou_predictions, batch_iou, reduction='mean')
 

@@ -62,12 +62,16 @@ class COCODataset(Dataset):
         else:         
             self.ann_valid = []
             if self.cfg.dataset.use_center: self.centroids = []
-        
+
         # Calcola i dati principali per ogni immagine
         bar = tqdm.tqdm(total = len(self.image_ids), desc = "Uploading dataset...", leave=False)
         for image_id in self.image_ids:
+            image_info = self.coco.loadImgs(image_id)[0]
             ann_ids = self.coco.getAnnIds(imgIds=image_id)
             anns = self.coco.loadAnns(ann_ids)
+
+            H, W = (image_info['height'], image_info['width'])
+            automatic_grid = build_point_grid(32) * np.array((H, W))[None, ::-1]
 
             masks = []
             points_0 = []
@@ -92,7 +96,7 @@ class COCODataset(Dataset):
                 points_0.append(list_points_0)
 
                 if not sav:
-                    center_of_mass = None
+                    center_point = None
                     n_pos, n_neg = (self.cfg.dataset.positive_points, self.cfg.dataset.negative_points)
                     is_valid = len(list_points_1) >= n_pos and len(list_points_0) >= n_neg
 
@@ -103,16 +107,17 @@ class COCODataset(Dataset):
                     have the points that are needed for the training.
                     """
                     if is_valid and n_pos > 0 and self.cfg.dataset.use_center: 
-                        # implemente Centroidal Voronoi Tessellation (CVT)
-                        # Questo approccio sfrutta i concetti di centroidi Voronoi per determinare il punto più centrale all'interno della maschera binaria.
-                        try:
-                            vor = Voronoi(list_points_1) # Calcola i diagrammi di Voronoi utilizzando i punti forniti. I punti di Voronoi sono i centroidi dei poligoni di Voronoi, che corrispondono ai punti più centrali rispetto ai punti di campionamento.
-                            center_of_mass = vor.points[np.argsort(np.linalg.norm(vor.points - vor.points.mean(axis=0), axis=1))][0] # Trova il punto più centrale, che corrisponde al generatore del diagramma Voronoi
-                        except Exception as e:
-                            is_valid = False
+                            points = np.array(list_points_1)
+                            center_index = np.argsort(np.linalg.norm(np.array(list_points_1) - points.mean(axis=0), axis=1))[0]
+                            center_point = points[center_index]
+
+                            # AGGIUNGERE UN CONFIG PER SCEGLIERE SE ALLINEARE O MENO IL CENTRO DI MASSA ALLA GRIGLIA
+                            distances = np.linalg.norm(automatic_grid - center_point, axis=1)
+                            nearest_point_index = np.argmin(distances)
+                            center_point = automatic_grid[nearest_point_index]
                     
                     ann_valid.append(is_valid)
-                    if self.cfg.dataset.use_center: centroids.append(center_of_mass)
+                    if self.cfg.dataset.use_center: centroids.append(center_point)
         
             # Append the data for the image
             self.points_1.append(points_1)
@@ -157,8 +162,6 @@ class COCODataset(Dataset):
         # Get original size of the image
         H, W, _ = image.shape
         original_size = (H, W)
-
-        automatic_grid = build_point_grid(32) * np.array((H, W))[None, ::-1]
 
         ann_ids = self.coco.getAnnIds(imgIds=image_id)
         anns = self.coco.loadAnns(ann_ids)
@@ -243,18 +246,12 @@ class COCODataset(Dataset):
                 boxes.append([x, y, x + w, y + h])
                 
                 if n_pos > 0 and self.cfg.dataset.use_center:
-                    center_of_mass = self.centroids[idx][i].copy()
+                    center_point = self.centroids[idx][i].copy()
                     n_pos = n_pos-1 if n_pos > 1 else 0
                 
                 points_1, points_0 = (random.sample(points, n_points) for points, n_points in zip([points_1, points_0], [n_pos, n_neg]))
-                if 'center_of_mass' in locals(): 
-                    # points_1.append(center_of_mass)
-                    # AGGIUNGERE UN CONFIG PER SCEGLIERE SE ALLINEARE O MENO IL CENTRO DI MASSA ALLA GRIGLIA
-                    distances = np.linalg.norm(automatic_grid - center_of_mass, axis=1)
-                    nearest_point_index = np.argmin(distances)
-                    nearest_point = automatic_grid[nearest_point_index]
-                    
-                    points_1.append(nearest_point)
+                if 'center_point' in locals(): 
+                    points_1.append(center_point)
 
                 label_1, label_0 = ([v] * len(points) for points, v in zip([points_1, points_0], [1, 0]))
 
@@ -409,12 +406,12 @@ def load_dataset(cfg: Box, img_size: int) -> Tuple[DataLoader, DataLoader]:
         train_root_path = os.path.join(main_directory, cfg.dataset.no_split_path.train.root_dir)
         train_path = os.path.join(train_root_path, cfg.dataset.no_split_path.train.images_dir)
         train_annotations_path = os.path.join(train_root_path, cfg.dataset.no_split_path.train.annotation_file)
-        train_sav_path = os.path.join(data_root_path, cfg.dataset.no_split_path.train.sav)
+        train_sav_path = os.path.join(train_root_path, cfg.dataset.no_split_path.train.sav)
 
         val_root_path = os.path.join(main_directory, cfg.dataset.no_split_path.val.root_dir)    
-        val_path =  os.path.join(val_root_path, cfg.dataset.val.images_dir)
+        val_path =  os.path.join(val_root_path, cfg.dataset.no_split_path.val.images_dir)
         val_annotations_path = os.path.join(val_root_path, cfg.dataset.no_split_path.val.annotation_file)
-        val_sav_path = os.path.join(data_root_path, cfg.dataset.no_split_path.val.sav)
+        val_sav_path = os.path.join(val_root_path, cfg.dataset.no_split_path.val.sav)
 
 
         train_data = COCODataset(images_dir=train_path,
@@ -434,11 +431,11 @@ def load_dataset(cfg: Box, img_size: int) -> Tuple[DataLoader, DataLoader]:
         if not os.path.exists(train_sav_path) or not os.path.exists(val_sav_path):
             train_save_data = {
                 'ann_valid': train_data.ann_valid,
-                'centroids': train_data.centroids if hasattr(data, 'centroids') else None
+                'centroids': train_data.centroids if hasattr(train_data, 'centroids') else None
             }
             val_save_data = {
                 'ann_valid': val_data.ann_valid,
-                'centroids': val_data.centroids if hasattr(data, 'centroids') else None
+                'centroids': val_data.centroids if hasattr(val_data, 'centroids') else None
             }
             torch.save(train_save_data, train_sav_path)
             torch.save(val_save_data, val_sav_path)
@@ -449,7 +446,7 @@ def load_dataset(cfg: Box, img_size: int) -> Tuple[DataLoader, DataLoader]:
                                   shuffle=True,
                                   generator=generator,
                                   num_workers=cfg.num_workers,
-                                  collate_fn=get_collate_fn(cfg, "train"))
+                                  collate_fn=get_collate_fn(cfg, "val"))
 
     val_dataloader = DataLoader(val_data,
                                 batch_size=cfg.batch_size,

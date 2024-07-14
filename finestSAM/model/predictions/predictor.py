@@ -39,6 +39,7 @@ def automatic_predictions(
 
     # Get the image
     image = cv2.imread(image_path)
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
     # Load the model 
     with torch.no_grad():
@@ -59,43 +60,45 @@ def automatic_predictions(
         masks = predictor.generate(image)
 
     # Show the image with the masks
-    polygons = []
-    for mask in masks:
-        mask = mask["segmentation"].astype(np.uint8)
+    # polygons = []
+    # for mask in masks:
+    #     mask = mask["segmentation"].astype(np.uint8)
 
-        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_TC89_L1)
+    #     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_TC89_L1)
         
-        for contour in contours:
-          epsilon = approx_accuracy * cv2.arcLength(contour, True)
-          approx = cv2.approxPolyDP(contour, epsilon, True)
-          points = [(int(point[0][0]), -int(point[0][1])) for point in approx]
-          polygons.append(Polygon(points))
+    #     for contour in contours:
+    #       epsilon = approx_accuracy * cv2.arcLength(contour, True)
+    #       approx = cv2.approxPolyDP(contour, epsilon, True)
+    #       points = [(int(point[0][0]), -int(point[0][1])) for point in approx]
+    #       polygons.append(Polygon(points))
            
     # Se non esiste la cartella di output, la crea
     os.makedirs(cfg.out_dir, exist_ok=True)
 
     # Salvataggio delle predizioni come file .shp
-    gdf = gpd.GeoDataFrame(geometry=polygons)
-    gdf.to_file(os.path.join(cfg.out_dir, "output.shp"))
+    # gdf = gpd.GeoDataFrame(geometry=polygons)
+    # gdf.to_file(os.path.join(cfg.out_dir, "output.shp"))
 
     # Salvataggio delle predizioni come file .png
+    fig, ax = plt.subplots(figsize=(6.4, 6.4), dpi=100)  # 6.4 inches * 100 dpi = 640 pixels
+    ax.set_position([0, 0, 1, 1])  # [left, bottom, width, height]
     plt.imshow(image)
-    show_anns(masks, opacity=1)
+    show_anns(masks, opacity=0.9)
     plt.axis('off')
-    plt.savefig(os.path.join(cfg.out_dir, "output.png"))
+    plt.savefig(os.path.join(cfg.out_dir, "output.png"), dpi=100, bbox_inches='tight', pad_inches=0)
     plt.show()
     plt.clf()
 
     # Salvataggio delle predizioni come file .svg
-    fig, ax = plt.subplots()
-    gdf.boundary.plot(ax=ax)
-    ax.set_aspect('equal')
-    ax.axis('off')
-    ax.set_xticks([])
-    plt.savefig(os.path.join(cfg.out_dir, "output.svg"))
-    plt.clf()
+    # fig, ax = plt.subplots()
+    # gdf.boundary.plot(ax=ax)
+    # ax.set_aspect('equal')
+    # ax.axis('off')
+    # ax.set_xticks([])
+    # plt.savefig(os.path.join(cfg.out_dir, "output.svg"))
+    # plt.clf()
     
-    plt.close('all')
+    # plt.close('all')
     print("Predizioni Salvate")
 
     

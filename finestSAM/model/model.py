@@ -77,7 +77,7 @@ class FinestSAM(nn.Module):
                 shape BxCxHxW, where H=W=256. Can be passed as mask input
                 to subsequent iterations of prediction.
         """
-        input_images = torch.stack([self.preprocess(x["image"]) for x in batched_input], dim=0)
+        input_images = torch.stack([self.model.preprocess(x["image"]) for x in batched_input], dim=0)
         image_embeddings = self.model.image_encoder(input_images)
 
         input_masks = [x["mask_inputs"] if "mask_inputs" in x and x["mask_inputs"] is not None else None for x in batched_input]
@@ -139,8 +139,8 @@ class FinestSAM(nn.Module):
             min_mask_region_area: int = 0
         ):
         return SamAutomaticMaskGenerator(model=self.model, 
-                                         pred_iou_thresh = 0.4,
-                                         stability_score_thresh = 0.8,
-                                         stability_score_offset = 0,
-                                         box_nms_thresh = 0.4,
-                                         min_mask_region_area=min_mask_region_area)
+                                         pred_iou_thresh = 0.88,
+                                         stability_score_thresh = 0.95,
+                                         stability_score_offset = 1.0,
+                                         box_nms_thresh = 0.7,
+                                         min_mask_region_area=0)
