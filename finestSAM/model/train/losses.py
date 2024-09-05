@@ -3,56 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-'''
-Alpha:
-    Fattore di ponderazione utilizzato per bilanciare l'importanza degli esempi positivi (maschere effettive) rispetto a quelli negativi (background dell'immagine).
-
-    Valore variabile tra 0 e 1.
-
-    Il valore indica il peso da dare alla classe positiva nel calcolo della loss.
-    La classe negativa avrà un peso pari a 1 - alpha.
-
-    alpha = 0.5:
-        Bilancia equamente le classi positive e negative.
-        Utile in dataset bilanciati.
-
-    alpha > 0.5:
-        Aumenta l'importanza degli esempi della classe positiva (generalmente minoritaria).
-        Esempi comuni: alpha tra 0.6 e 0.9.
-        Più alpha è vicino a 1, maggiore è l'importanza data alla classe positiva.
-        Utile in dataset con un forte squilibrio a favore della classe negativa.
-
-    alpha < 0.5:
-        Aumenta l'importanza degli esempi della classe negativa.
-        Meno comune, ma può essere utile se la classe negativa è minoritaria e di maggiore interesse.
-
-          
-Gamma:
-    Fattore di modulazione che aiuta a ridurre il peso degli esempi ben classificati, concentrandosi maggiormente sugli esempi difficili.
-    (Particolarmente utile nei casi in cui il modello può facilmente classificare molti esempi corretti, ma ha difficoltà con quelli più complessi)
-
-    Valore intero positivo.
-
-    Il valore indica quanto dare più peso agli esempi difficili rispetto a quelli facili.
-
-    gamma = 0:
-        La perdita focale diventa la stessa della cross-entropy loss standard.
-        Tutti gli esempi contribuiscono allo stesso modo alla perdita.
-
-    gamma tra 1 e 2:
-        Riduce il peso degli esempi ben classificati.
-        Valori comuni: gamma = 2 è spesso utilizzato.
-        Aiuta a migliorare le prestazioni sugli esempi difficili senza penalizzare eccessivamente quelli facili.
-
-    gamma > 2:
-        Aumenta ulteriormente l'importanza degli esempi difficili.
-        Utile in dataset con squilibrio molto forte, dove è critico concentrarsi sugli esempi difficili.
-        Valori tipici: gamma tra 3 e 5.
-
-fonte: https://arxiv.org/abs/1708.02002
-'''
-
-
 class DiceLoss(nn.Module):
     
     def __init__(self, smooth: int = 1e-7):
@@ -62,6 +12,7 @@ class DiceLoss(nn.Module):
     def forward(self, inputs: torch.Tensor, targets: torch.Tensor, num_masks: int) -> torch.Tensor:
         """
         Compute the DICE loss, similar to generalized IOU for masks
+
         Args:
             inputs: A float tensor of arbitrary shape.
                     The predictions for each example.
@@ -143,7 +94,7 @@ class CalcIoU(nn.Module):
                     classification label for each element in inputs
                     (0 for the negative class and 1 for the positive class).
         """
-        inputs = (inputs > 0).float() # INSERIRE VARIABILE COMUNE A VALIDATION
+        inputs = (inputs > 0).float()
 
         inputs = inputs.flatten(1)
         targets = targets.flatten(1)

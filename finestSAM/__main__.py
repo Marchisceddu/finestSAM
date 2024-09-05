@@ -13,17 +13,16 @@ if __name__ == "__main__":
         predict_parser = argparse.ArgumentParser()
         predict_parser.add_argument('--input', type=str, required=True, help='Path dell\'immagine da analizzare')
         predict_parser.add_argument('--approx_accuracy', type=float, default=cfg.approx_accuracy, help='Accuratezza approssimativa dei poligoni')
+        predict_parser.add_argument('--opacity', type=float, default=cfg.opacity, help='Trasparenza delle maschere predette durante la stampa dell\'immagine')
         predict_args = predict_parser.parse_args(unknown)
     elif args.mode == 'train':
         from config import cfg_train as cfg
 
         predict_args = None
 
-    # scrivere una funzione check per il file cfg
-
     # Execute the selected mode 
     switcher = {
         "train": call_train,
-        "predict": lambda cfg: automatic_predictions(cfg, predict_args.input, predict_args.approx_accuracy)
+        "predict": lambda cfg: automatic_predictions(cfg, predict_args.input, predict_args.approx_accuracy, predict_args.opacity)
     }
     switcher[args.mode](cfg)

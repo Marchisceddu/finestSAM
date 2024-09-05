@@ -5,46 +5,23 @@ Questo progetto è stato realizzato come progetto di tesi per l'Università degl
 * [Marco Pilia](https://github.com/Marchisceddu)
 * [Simone Dessi](https://github.com/Druimo)
 
-Lo scopo principale è cercare di fare il fine tuning del modello Segment-Anything di MetaAI su un set di dati personalizzati in formato COCO.
+Lo scopo principale è cercare di fare il fine tuning del modello Segment-Anything di MetaAI su un set di dati personalizzati in formato COCO, riuscendo a fornire un'implementazione efficacie per quanto riguarda le predizioni tramite il predittore automatico di SAM.
 Il codice sfrutta il framework Fabric di Lightning AI per fornire un implementazione efficiente del modello.
 
-CONTINUARE LA DESCRIZIONE
+## Importazione Dataset:
 
-## Creazione dataset:
-* Aggiungere all'interno della cartella: [create_dataset/shp/](https://github.com/Marchisceddu/Progetto_Urbismap/blob/main/create_dataset/shp) i dati inseriti in cartelle formattate come segue:
+Inserire un dataset formato coco all'interno della main dir, la cartella dev'essere formattata come segue:
 
     ```python
-    shp/
-    ├── image01/
-    │   ├── image01.shp
-    │   ├── ... # Resto dei file che servono per il file shp (.cpg, .dbf, .prj, .shx)
-    │   ├── img.tif
-    │   ├── img2.tif # Ci possono essere più tif georeferenziate per ogni file shp
+    datset/
+    ├── images/ # Le immagini del dataset
+    │   ├── 0.png
+    │   ├── 1.png
     │   └── ...
-    ├── image02/
-    │   ├── image02.shp
-    │   ├── ... # Resto dei file che servono per il file shp (.cpg, .dbf, .prj, .shx)
-    │   ├── img.tif
-    │   ├── img2.tif
-    │   └── ...
-    └── ...
+    └── annotations.json # annotazioni formato coco
     ```
 
-* Eseguire il file [create_dataset/__main__.py](https://github.com/Marchisceddu/Progetto_Urbismap/blob/main/create_dataset/__main__.py):
-
-    Args (opzionali):
-    ```python
-     --scegli_input (bool) default:False # Se True, permette di scegliere la cartella di input 
-                                            # (deve essere formattata come la cartella shp)
-
-     --mostra_output (bool) default:False # Se True, mostra l'output del dataset
-     ```
-
-    Run:
-
-       python create_dataset --scegli_input False --mostra_output True
-
-  questo creerà il dataset in formato COCO all'interno della cartella [dataset/](https://github.com/Marchisceddu/Progetto_Urbismap/tree/main/dataset/)
+ Per specificare al modello il nome del dataset inserito modificare le voci correlate come spiegato nella sezione Config (mettere link), di default viene cercata la cartella "dataset".
 
 ## Setup:
 
@@ -75,6 +52,7 @@ Generali:
 "num_devices": int # Numero di dispositivi da utilizzare
             or (list str) # definire queli GPU utilizzare
             or str = "auto",
+"num_nodes": int, # Numero di nodi GPU per l'addestramento distribuito
 "seed_device": int / None per random,
 "sav_dir": str, # Cartella di output per i salvataggi
 "out_dir": str, # Cartella di output per le predizioni
@@ -91,7 +69,6 @@ Train:
 "batch_size": int, # Grandezza batch delle immagini
 "num_workers": int, # Quanti sottoprocessi utilizzare per il caricamento dei dati (0 -> i dati verranno caricati nel processo principale)
 
-"train_type": str = "custom" or "11_iterations",
 "num_epochs": int, # Numero di epoche di train
 "eval_interval": int, # Intervallo di validazione
 "eval_improvement": float (0-1), # Percentuale oltre il quale avviene il salvataggio
@@ -106,10 +83,23 @@ Train:
 "opt": {
     "learning_rate": int,
     "weight_decay": int,
-    "decay_factor": int,
-    "steps": [int, int],
-    "warmup_steps": int,
 },
+
+"sched": {
+        "type": str = "ReduceLROnPlateau" or  "LambdaLR"
+        "LambdaLR": {
+            "decay_factor": int, # fattore di dacadimento del lr funziona tramite la formula -> 1 / (decay_factor ** (mul_factor+1))
+            "steps": list int, # lista che indica ogni quante epoche deve decadere il lr (il primo step dev'essere maggiore di warmup_steps)
+            "warmup_steps": int, # aumenta il lr fino ad arrivare a stabilizzarlo in questo numero d'epoche
+        },
+        "ReduceLROnPlateau": {
+            "decay_factor": float (0-1), # fattore di dacadimento del lr funziona tramite la formula -> lr * factor -> 8e-4 * 0.1 = 8e-5
+            "epoch_patience": int, # Pazienza per il decadimento del lr
+            "threshold": float,
+            "cooldown": int,
+            "min_lr": int,
+        },
+    },
 
 "losses": {
     "focal_ratio": float, # Peso di Focal loss sulla loss totale
@@ -129,35 +119,46 @@ Train:
 
 "dataset": {
     "auto_split": bool, # Se True verra usato il dataset presente in path ed effettuare uno split per la validation della dimensione di val_size 
-        "path": {
-            "root_dir": str,
-            "annotation_file": str,
-        },
+    "seed": 42,
+    "split_path": {
+        "root_dir": str,
+        "images_dir": str,
+        "annotation_file": str,
+        "sav": str, # Eliminare il sav vecchio ad ogni cambio di impostazione
+        "val_size": float (0-1), # Percentuale grandezza validation dataset
+    },
+    "no_split_path": {
         "train": {
             "root_dir": str,
+            "images_dir": str,
             "annotation_file": str,
+            "sav": str, # Eliminare il sav vecchio ad ogni cambio di impostazione
         },
         "val": {
             "root_dir": str,
+            "images_dir": str,
             "annotation_file": str,
+            "sav": str, # Eliminare il sav vecchio ad ogni cambio di impostazione
         },
-
-    "val_size": float (0-1), # Percentuale grandezza validation dataset
+    },
     "positive_points": int, # Numero punti positivi passati con __getitem__
     "negative_points": int, # Numero punti negativi passati con __getitem__
+    "use_center": True, # il primo punto positivo sarà sempre il centro di massa
+    "snap_to_grid": True, # allinea il centro di massa alla griglia di predizione utilizzata dal presdittore automatico
 }
 ```
 
 Predizioni:
 ```python
 "approx_accuracy": float, # The approximation accuracy of the polygons
+"opacity": float, 
 ```
 
 </details>
 
 ## Run model:
 
-Eseguire il file [shape_SAM/__main__.py](https://github.com/Marchisceddu/Progetto_Urbismap/blob/main/shape_SAM/__main__.py)
+Eseguire il file [finestSAM/__main__.py](https://github.com/Marchisceddu/Progetto_Urbismap/blob/main/finestSAM/__main__.py)
 
 Args (obbligatori):
 
@@ -181,11 +182,8 @@ Args (obbligatori):
 
     ```python
     --approx_accuracy (float) default:0.01 # The approximation accuracy of the polygons
+    --opacity (float) default:0.9 
     ```
-
-### Predizioni manuali:
-
-Per il momento non sono ancora disponibili, si possono effetuare sia tramite boxe sia tramite punti, c'è un piccolo esempio in prediction ma vanno aggiustate fornendo magai un interfaccia grafica per poter far disegnare i punti o le boxe sull'immagini da predirre
 
 ## Resources
 

@@ -1,33 +1,37 @@
 import os
 import cv2
+import tqdm
 import torch
+import random
 import numpy as np
-import torchvision.transforms as transforms
 import torch.nn.functional as F
-from typing import Tuple, List
+import torchvision.transforms as transforms
 from box import Box
+from typing import Tuple, List
 from pycocotools.coco import COCO
-from .segment_anything.utils.transforms import ResizeLongestSide
 from torch.utils.data import (
     Dataset,
     DataLoader,
     random_split
 )
-import matplotlib.pyplot as plt
+from .segment_anything.utils.transforms import ResizeLongestSide
+from .segment_anything.utils.amg import build_point_grid
+
 
 class COCODataset(Dataset):
 
     def __init__(
             self, 
-            root_dir: str, 
+            images_dir: str, 
             annotation_file: str, 
             cfg: Box,
             transform: transforms.Compose = None, 
-            seed: int = None
+            seed: int = None,
+            sav: str = None,
         ):
         """
         Args:
-            root_dir (str): The root directory of the images.
+            images_dir (str): The root directory of the images.
             annotation_file (str): The path to the annotation file.
             cfg (Box): The configuration file.
             transform (transforms.Compose): The transformation to apply to the data.
@@ -35,13 +39,91 @@ class COCODataset(Dataset):
         """
         self.cfg = cfg
         self.seed = seed
-        self.root_dir = root_dir
+        self.images_dir = images_dir
         self.transform = transform
         self.coco = COCO(annotation_file)
         self.image_ids = list(self.coco.imgs.keys())
 
         # Filter out image_ids without any annotations
         self.image_ids = [image_id for image_id in self.image_ids if len(self.coco.getAnnIds(imgIds=image_id)) > 0]
+
+        # Data for __getitem__
+        self.points_1 = []
+        self.points_0 = []
+        self.masks = []
+        if sav:
+            dati = torch.load(sav)
+            self.ann_valid = dati['ann_valid']
+            if self.cfg.dataset.use_center: self.centroids = dati['centroids']
+        else:         
+            self.ann_valid = []
+            if self.cfg.dataset.use_center: self.centroids = []
+
+        # Calcola i dati principali per ogni immagine
+        bar = tqdm.tqdm(total = len(self.image_ids), desc = "Uploading dataset...", leave=False)
+        for image_id in self.image_ids:
+            image_info = self.coco.loadImgs(image_id)[0]
+            ann_ids = self.coco.getAnnIds(imgIds=image_id)
+            anns = self.coco.loadAnns(ann_ids)
+
+            H, W = (image_info['height'], image_info['width'])
+            automatic_grid = build_point_grid(32) * np.array((H, W))[None, ::-1]
+
+            masks = []
+            points_0 = []
+            points_1 = []
+            if not sav:
+                centroids = []
+                ann_valid = []
+
+            for ann in anns:
+                # Get the bounding box
+                x, y, w, h = ann['bbox']
+
+                # Get the mask
+                mask = self.coco.annToMask(ann)
+                masks.append(mask)
+                
+                # Get the points for the mask
+                roi = mask[y:y + h, x:x + w] # Remove if you don't want the negative points only within the box.
+                list_points_1, list_points_0 = ([(px + x, py + y) for py, px in zip(*np.where(roi == v))] for v in [1, 0])
+                
+                points_1.append(list_points_1)
+                points_0.append(list_points_0)
+
+                if not sav:
+                    center_point = None
+                    n_pos, n_neg = (self.cfg.dataset.positive_points, self.cfg.dataset.negative_points)
+                    is_valid = len(list_points_1) >= n_pos and len(list_points_0) >= n_neg
+
+                    """
+                    During the conversion of the resolution of the mask, some details can be lost, 
+                    and the annootation becomes less accurate and too small to be used.
+                    So, we need to filter out those annotations and keep only the ones that at least
+                    have the points that are needed for the training.
+                    """
+                    if is_valid and n_pos > 0 and self.cfg.dataset.use_center: 
+                            points = np.array(list_points_1)
+                            center_index = np.argsort(np.linalg.norm(np.array(list_points_1) - points.mean(axis=0), axis=1))[0]
+                            center_point = points[center_index]
+
+                            if self.cfg.dataset.snap_to_grid:
+                                distances = np.linalg.norm(automatic_grid - center_point, axis=1)
+                                nearest_point_index = np.argmin(distances)
+                                center_point = automatic_grid[nearest_point_index]
+                    
+                    ann_valid.append(is_valid)
+                    if self.cfg.dataset.use_center: centroids.append(center_point)
+        
+            # Append the data for the image
+            self.points_1.append(points_1)
+            self.points_0.append(points_0)
+            self.masks.append(masks)
+            if not sav:
+                self.ann_valid.append(ann_valid)
+                if self.cfg.dataset.use_center: self.centroids.append(centroids)
+
+            bar.update(1)
 
     def __len__(self):
         return len(self.image_ids)
@@ -58,16 +140,17 @@ class COCODataset(Dataset):
                 the point coordinates, 
                 the point labels, 
                 the boxes, 
-                the masks, 
+                the masks,
                 the resized masks, 
         """
         # Set the seed for reproducibility
+        random.seed(self.seed)
         np.random.seed(self.seed)
 
         # Restor the image from the folder
         image_id = self.image_ids[idx]
         image_info = self.coco.loadImgs(image_id)[0]
-        image_path = os.path.join(self.root_dir, image_info['file_name'])
+        image_path = os.path.join(self.images_dir, image_info['file_name'])
         image = cv2.imread(image_path)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         original_image = image.copy()
@@ -83,75 +166,43 @@ class COCODataset(Dataset):
         point_labels = []
         masks = []
 
-        # Get box, point and mask for any annotation
-        for ann in anns:
+        # Get box, point and mask for any annotations
+        for i, ann in enumerate(anns):
             # Get the bounding box
             x, y, w, h = ann['bbox']
 
             # Add random noise to each coordinate with standard deviation equal to 10% of the box sidelength, to a maximum of 20 pixels
-            x = max(0, int(x + np.random.normal(0, 0.1 * w)))
-            y = max(0, int(y + np.random.normal(0, 0.1 * h)))
-            w = min(W - x, int(w + np.random.normal(0, 0.1 * w)))
-            h = min(H - y, int(h + np.random.normal(0, 0.1 * h)))
+            ''' 
+            Add the code here
 
-            # check if the new box is contained in the image 
-            if x + w > W:
-                w = W - x
-            if y + h > H:
-                h = H - y
-            if x < 0:
-                x = 0
-            if y < 0:
-                y = 0
+            Se il codice non c'è viene considerata la box originale
+            '''
+        
+            # Get the masks
+            mask = self.masks[idx][i].copy()
 
-            # Get the mask
-            mask = self.coco.annToMask(ann)
+            points_1 = self.points_1[idx][i].copy()
+            points_0 = self.points_0[idx][i].copy()
+
+            n_pos, n_neg = (self.cfg.dataset.positive_points, self.cfg.dataset.negative_points)
             
-            # Get the points for the mask
-            list_point_0 = []
-            list_point_1 = []
-            for j in range(y, y + h):
-                for i in range(x, x + w):
-                    if i >= 0 and i < len(mask[0]) and j >= 0 and j < len(mask):
-                        if mask[j][i]:
-                            list_point_1.append([i, j])
-                        else:
-                            list_point_0.append([i, j])
-
-            """
-            During the conversion of the resolution of the mask, some details can be lost, 
-            and the annootation becomes less accurate and too small to be used.
-            So, we need to filter out those annotations and keep only the ones that at least
-            have the points that are needed for the training.  
-            """
-            if len(list_point_1) >= self.cfg.dataset.positive_points and len(list_point_0) >= self.cfg.dataset.negative_points: 
+            if self.ann_valid[idx][i]: 
                 masks.append(mask)
                 boxes.append([x, y, x + w, y + h])
+                
+                if n_pos > 0 and self.cfg.dataset.use_center:
+                    center_point = self.centroids[idx][i].copy()
+                    n_pos = n_pos-1 if n_pos > 1 else 0
+                
+                points_1, points_0 = (random.sample(points, n_points) for points, n_points in zip([points_1, points_0], [n_pos, n_neg]))
+                if 'center_point' in locals(): 
+                    points_1.append(center_point)
 
-                temp_list_point = []
-                for i in range(0, self.cfg.dataset.positive_points):
-                    idx = np.random.randint(0, len(list_point_1))
-                    temp_list_point.append(list_point_1[idx])
-                list_point_1 = temp_list_point.copy()
+                label_1, label_0 = ([v] * len(points) for points, v in zip([points_1, points_0], [1, 0]))
 
-                temp_list_point = []
-                for i in range(0, self.cfg.dataset.negative_points):
-                    idx = np.random.randint(0, len(list_point_0))
-                    temp_list_point.append(list_point_0[idx])
-                list_point_0 = temp_list_point.copy()
-
-                list_label_0 = [0] * len(list_point_0)
-                list_label_1 = [1] * len(list_point_1)
-
-                point_coords.append(list_point_1 + list_point_0)
-                point_labels.append(list_label_1 + list_label_0)
+                point_coords.append(points_1 + points_0)
+                point_labels.append(label_1 + label_0)
     
-        if len(point_coords) == 0:
-            print("non ci sono punti")
-            plt.imshow(original_image)
-            plt.axis('off')
-            plt.savefig("immagine_errore.png")
-
         if self.transform:
             image, resized_masks, boxes, point_coords = self.transform(image, masks, np.array(boxes), np.array(point_coords))
 
@@ -168,12 +219,11 @@ class COCODataset(Dataset):
         return image, original_image, original_size, point_coords, point_labels, boxes, masks, resized_masks
     
 
-class ResizeAndPad:
+class ResizeData:
 
     def __init__(self, target_size: int):
         self.target_size = target_size
         self.transform = ResizeLongestSide(target_size)
-        self.to_tensor = transforms.ToTensor()
 
     def __call__(
             self, 
@@ -185,8 +235,9 @@ class ResizeAndPad:
         # Resize image and masks
         og_h, og_w, _ = image.shape
         image = self.transform.apply_image(image)
-        masks = [torch.tensor(self.transform.apply_image(mask)) for mask in masks]        
-        image = self.to_tensor(image)
+        masks = [torch.tensor(self.transform.apply_image(mask)) for mask in masks]
+        image = torch.as_tensor(image)
+        image = image.permute(2, 0, 1).contiguous()
 
         # Resize masks to 1/4th resolution of the image
         resized_masks = []
@@ -200,7 +251,9 @@ class ResizeAndPad:
 
         return image, resized_masks, boxes, point_coords
 
+
 def get_collate_fn(cfg: Box, type):
+    
     def collate_fn(batch: List[Tuple]):
         batched_data = []
 
@@ -240,56 +293,89 @@ def load_dataset(cfg: Box, img_size: int) -> Tuple[DataLoader, DataLoader]:
     Returns:
         Tuple[DataLoader, DataLoader]: The training and validation dataloaders.
     """
+    # Set the seed 
+    generator = torch.Generator()
+    if cfg.dataset.seed != None:
+        generator.manual_seed(cfg.dataset.seed)
+
     # Set up the transformation for the dataset
-    transform = ResizeAndPad(img_size)
+    transform = ResizeData(img_size)
 
     # Load the dataset
     main_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
     if cfg.dataset.auto_split:
-        data_path = os.path.join(main_directory, cfg.dataset.path.root_dir)
-        annotations_path = os.path.join(main_directory, cfg.dataset.path.annotation_file)
+        data_root_path = os.path.join(main_directory, cfg.dataset.split_path.root_dir)
+        data_path = os.path.join(data_root_path, cfg.dataset.split_path.images_dir)
+        annotations_path = os.path.join(data_root_path, cfg.dataset.split_path.annotation_file)
+        sav_path = os.path.join(data_root_path, cfg.dataset.split_path.sav)
 
-        data = COCODataset(root_dir=data_path,
+        data = COCODataset(images_dir=data_path,
                         annotation_file=annotations_path,
                         cfg=cfg,
                         transform=transform,
-                        seed=cfg.seed_dataloader)
+                        seed=cfg.seed_dataloader,
+                        sav=(sav_path if os.path.exists(sav_path) else None))
         
-         # Calc the size of the validation set
+        if not os.path.exists(sav_path):
+            save_data = {
+                'ann_valid': data.ann_valid,
+                'centroids': data.centroids if hasattr(data, 'centroids') else None
+            }
+            torch.save(save_data, sav_path)
+            print("Dataset saved")
+        
+        # Calc the size of the validation set
         total_size = len(data)
-        val_size = int(total_size * cfg.dataset.val_size)
-
-        # Set the seed 
-        generator = torch.Generator()
-        if cfg.dataset.seed_split != None:
-            generator.manual_seed(cfg.dataset.seed_split)
+        val_size = int(total_size * cfg.dataset.split_path.val_size)
 
         # Split the dataset into training and validation
         train_data, val_data = random_split(data, [total_size - val_size, val_size], generator=generator)
     else:
-        train_path = os.path.join(main_directory, cfg.dataset.train.root_dir)
-        val_path =  os.path.join(main_directory, cfg.dataset.val.root_dir)
-        train_annotations_path = os.path.join(main_directory, cfg.dataset.train.annotation_file)
-        val_annotations_path = os.path.join(main_directory, cfg.dataset.train.annotation_file)
+        train_root_path = os.path.join(main_directory, cfg.dataset.no_split_path.train.root_dir)
+        train_path = os.path.join(train_root_path, cfg.dataset.no_split_path.train.images_dir)
+        train_annotations_path = os.path.join(train_root_path, cfg.dataset.no_split_path.train.annotation_file)
+        train_sav_path = os.path.join(train_root_path, cfg.dataset.no_split_path.train.sav)
 
-        train_data = COCODataset(root_dir=train_path,
+        val_root_path = os.path.join(main_directory, cfg.dataset.no_split_path.val.root_dir)    
+        val_path =  os.path.join(val_root_path, cfg.dataset.no_split_path.val.images_dir)
+        val_annotations_path = os.path.join(val_root_path, cfg.dataset.no_split_path.val.annotation_file)
+        val_sav_path = os.path.join(val_root_path, cfg.dataset.no_split_path.val.sav)
+
+
+        train_data = COCODataset(images_dir=train_path,
                         annotation_file=train_annotations_path,
                         cfg=cfg,
                         transform=transform,
-                        seed=cfg.seed_dataloader)
+                        seed=cfg.seed_dataloader,
+                        sav=(train_sav_path if os.path.exists(train_sav_path) else None))
     
-        val_data = COCODataset(root_dir=val_path,
+        val_data = COCODataset(images_dir=val_path,
                         annotation_file=val_annotations_path,
                         cfg=cfg,
                         transform=transform,
-                        seed=cfg.seed_dataloader)
+                        seed=cfg.seed_dataloader,
+                        sav=(val_sav_path if os.path.exists(val_sav_path) else None))
+        
+        if not os.path.exists(train_sav_path) or not os.path.exists(val_sav_path):
+            train_save_data = {
+                'ann_valid': train_data.ann_valid,
+                'centroids': train_data.centroids if hasattr(train_data, 'centroids') else None
+            }
+            val_save_data = {
+                'ann_valid': val_data.ann_valid,
+                'centroids': val_data.centroids if hasattr(val_data, 'centroids') else None
+            }
+            torch.save(train_save_data, train_sav_path)
+            torch.save(val_save_data, val_sav_path)
+            print("Dataset saved")
 
     train_dataloader = DataLoader(train_data,
                                   batch_size=cfg.batch_size,
                                   shuffle=True,
+                                  generator=generator,
                                   num_workers=cfg.num_workers,
-                                  collate_fn=get_collate_fn(cfg, "train"))
+                                  collate_fn=get_collate_fn(cfg, "val"))
 
     val_dataloader = DataLoader(val_data,
                                 batch_size=cfg.batch_size,

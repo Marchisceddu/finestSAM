@@ -3,7 +3,7 @@ from box import Box
 config = {
     "device": "auto",
     "num_devices": "auto",
-    "num_nodes": 1, # Numero di nodi GPU per l'addestramento distribuito
+    "num_nodes": 1,
     "seed_device": 1337,
     "sav_dir": "sav",
     "out_dir": "out",
@@ -82,7 +82,7 @@ config_train = {
                 "root_dir": "../dataset/train",
                 "images_dir": "images",
                 "annotation_file": "annotations.json",
-                "sav": "sav.pth"
+                "sav": "sav.pth" # Eliminare il salvataggio ogni volta che si cambia impoastazione
             },
             "val": {
                 "root_dir": "../dataset/val",
@@ -94,12 +94,13 @@ config_train = {
         "positive_points": 1,
         "negative_points": 0,
         "use_center": True, # il primo punto positivo sarà sempre il centro di massa
+        "snap_to_grid": True, # allinea il centro di massa alla griglia di predizione utilizzata dal presdittore automatico
     }
 }
 
 config_predict = {
     "approx_accuracy": 0.01,
-    # inserire la trasparenza delle maschere da disegnare sopra
+    "opacity": 0.9,
 }
 
 cfg_train = Box(config)

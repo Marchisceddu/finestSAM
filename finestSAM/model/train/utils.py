@@ -1,18 +1,13 @@
 import os
 import torch
 import lightning as L
+import matplotlib.pyplot as plt
 import segmentation_models_pytorch as smp
 from box import Box
 from typing import Tuple
 from torch.utils.data import DataLoader
 from lightning.fabric.fabric import _FabricOptimizer
 from ..model import FinestSAM
-
-# RIMUOVEREEEE
-from ..predictions.utils import (
-    show_mask,
-)
-import matplotlib.pyplot as plt
 
 
 class AverageMeter:
@@ -145,15 +140,6 @@ def validate(
                     stability_score = [torch.mean(score) for score in separated_scores]
                     pred_masks.append(separated_masks[torch.argmax(torch.tensor(stability_score))])
 
-                    # STAMPA DI DEBUG ELIMINARE
-                    # plt.imshow(data["original_image"])
-                    # for i, mask in enumerate(separated_masks[torch.argmax(torch.tensor(stability_score))]):
-                    #     show_mask(mask, plt.gca(), seed=i)
-                    # plt.axis('off')
-                    # plt.savefig(os.path.join(cfg.out_dir, "m.png"))
-                    # plt.show()
-                    # plt.clf()
-                    # plt.close('all')
                 else:
                     pred_masks.append(masks.squeeze(1))
 
@@ -164,7 +150,7 @@ def validate(
                     pred_mask,
                     gt_mask.int(),
                     mode='binary',
-                    threshold=0.5, # INSERIRE VARIABILE COMUNE A CALCIOU
+                    threshold=0.5,
                 )
                 batch_iou = smp.metrics.iou_score(*batch_stats, reduction="micro-imagewise")
                 ious.update(batch_iou, num_images)
@@ -239,7 +225,7 @@ def print_graphs(metrics: dict[list], out_plots: str):
         plt.savefig(os.path.join(out_plots, f"{metric_name}.png"))
         plt.clf()
       
-    plt.figure(figsize=(10, 6)) # FORSE FA AD AUMENTARE LA DIMENSIONE E DIVENTA PIU BELLINO
+    plt.figure(figsize=(10, 6))
 
     for metric_name in metric_names:
         if metric_name != "total_loss":

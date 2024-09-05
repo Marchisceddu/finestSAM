@@ -22,7 +22,7 @@ from .losses import (
 )
 from ..model import FinestSAM
 from .utils import configure_opt
-from ..dataset6 import load_dataset
+from ..dataset import load_dataset
 
 
 def call_train(cfg: Box):
@@ -46,9 +46,14 @@ def train(fabric, *args, **kwargs):
     """
     Main training function.
     
-    Args: RISCRIVERE
-        cfg (Box): The configuration file.
+    Args:
+        fabric (L.Fabric): The lightning fabric.
+        *args: The positional arguments:
+            [0] - cfg (Box): The configuration file.
+        **kwargs: The keyword arguments:
+            not used.
     """
+    # Get the arguments
     cfg = args[0]
 
     fabric.seed_everything(cfg.seed_device)
@@ -184,15 +189,6 @@ def train_loop(
                 iter_metrics["loss_dice"] += dice_loss(pred_masks, data["gt_masks"], len(pred_masks))
                 iter_metrics["loss_iou"] += F.mse_loss(iou_predictions, batch_iou, reduction='mean')
 
-                # STAMPA DI DEBUG ELIMINARE
-                # plt.imshow(data["original_image"])
-                # for i, mask in enumerate(pred_masks > 0):
-                #     show_mask(mask.clone().detach(), plt.gca(), seed=i)
-                # plt.axis('off')
-                # #plt.savefig(os.path.join(cfg.out_dir, "p.png"))
-                # plt.show()
-                # plt.clf()
-
             loss_total = cfg.losses.focal_ratio * iter_metrics["loss_focal"] + cfg.losses.dice_ratio * iter_metrics["loss_dice"] + cfg.losses.iou_ratio * iter_metrics["loss_iou"]
 
             # Backward pass
@@ -221,11 +217,7 @@ def train_loop(
         # Validate the model
         if (cfg.eval_interval > 0 and epoch % cfg.eval_interval == 0) or (epoch == cfg.num_epochs):
             val_score = validate(fabric, cfg, model, val_dataloader, epoch, val_score)
-            #save(fabric, model, cfg.sav_dir, "c")
-        
-        if epoch % 50 == 0:
-            save(fabric, model, cfg.sav_dir, f"{epoch}")
-
+            
         # Aggiorna le metriche per i plot
         metrics["dice_loss"].append(cfg.losses.dice_ratio * epoch_metrics.dice_losses.avg)
         metrics["focal_loss"].append(cfg.losses.focal_ratio * epoch_metrics.focal_losses.avg)

@@ -136,11 +136,15 @@ class FinestSAM(nn.Module):
 
     def get_automatic_predictor(
             self, 
-            min_mask_region_area: int = 0
+            pred_iou_thresh: float = 0.88,
+            stability_score_thresh: float = 0.95,
+            stability_score_offset: float = 1.0,
+            box_nms_thresh: float = 0.7,
+            min_mask_region_area: int = 300
         ):
         return SamAutomaticMaskGenerator(model=self.model, 
-                                         pred_iou_thresh = 0.88,
-                                         stability_score_thresh = 0.95,
-                                         stability_score_offset = 1.0,
-                                         box_nms_thresh = 0.7,
-                                         min_mask_region_area=0)
+                                          pred_iou_thresh=pred_iou_thresh,
+                                          stability_score_thresh=stability_score_thresh,
+                                          stability_score_offset=stability_score_offset,
+                                          box_nms_thresh=box_nms_thresh,
+                                          min_mask_region_area=min_mask_region_area)
