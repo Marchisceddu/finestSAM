@@ -1,5 +1,22 @@
+**/.ipynb_checkpoints/
 **/.DS_Store
 *.py[co]
 
 create_dataset/shp/*
-shape_SAM/sav/*.pth
+finestSAM/sav/*.pth
+finestSAM/sav/loggers_finestSAM/*
+finestSAM/out/*
+dataset/*
+
+create_dataset/shp1/*
+create_dataset/shpDaSplittare/*
+create_dataset/shpTrain/*
+create_dataset/shpVal/*
+create_dataset/shpVecchio/*
+dataset1/*
+datasetRidotto/*
+datasetDaSplittare/*
+datasetVecchio/*
+prove/*
+o.txt
+test/*

@@ -1,0 +1,16 @@
+geopandas
+lightning
+matplotlib
+numpy
+opencv-python
+pillow
+pycocotools
+python-box
+rasterio
+segmentation-models-pytorch
+shapely
+scipy
+torch
+torchvision
+tqdm
+tensorboard
