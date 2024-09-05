@@ -1,4 +1,4 @@
-# Shape_SAM
+# finestSAM
 
 Questo progetto è stato realizzato come progetto di tesi per l'Università degli Studi di Cagliari da:
 
