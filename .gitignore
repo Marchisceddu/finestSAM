@@ -192,9 +192,9 @@ __marimo__/
 **/.DS_Store
 
 # Model
-finestSAM/sav/*.pth
-finestSAM/sav/loggers_finestSAM/*
+finestSAM/sav/*
 finestSAM/out/*
+!finestSAM/sav/README.md
 
 # Dataset
-dataset/*
+Dataset/*

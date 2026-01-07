@@ -4,6 +4,8 @@ config = {
     "device": "auto",
     "num_devices": "auto",
     "num_nodes": 1,
+    "precision": "16-mixed",
+    "matmul_precision": "high",
     "seed_device": 1337,
     "sav_dir": "sav",
     "out_dir": "out",
@@ -14,23 +16,22 @@ config = {
     },
 }
 
-config_train = {
+config_training = {
     "seed_dataloader": None,
     "batch_size": 1,
     "num_workers": 0,
 
-    "num_epochs": 500,
-    "eval_interval": 3,
+    "num_epochs": 100,
+    "eval_interval": 5,
     "prompts": {
         "use_boxes": False,
         "use_points": True,
         "use_masks": False,
-        "use_logits": False,
     },
     "multimask_output": False,
 
     "opt": {
-        "learning_rate": 4e-5,
+        "learning_rate": 8e-4,
         "weight_decay": 1e-4,
     },
 
@@ -64,27 +65,81 @@ config_train = {
             "prompt_encoder": True,
             "mask_decoder": False,
         },
+        "LORA": {
+            "encoder": {
+                "enabled": True,
+                "lora_r": 16,
+                "lora_alpha": 32,
+                "lora_dropout": 0.1,
+                "lora_bias": False,
+                "lora_targets": {
+                    "qkv": True,
+                    "proj": True,
+                    "mlp_lin1": False,
+                    "mlp_lin2": False,
+                },
+            },
+            "decoder": {
+                "enabled": False,
+                "lora_r": 16,
+                "lora_alpha": 32,
+                "lora_dropout": 0.1,
+                "lora_bias": False,
+                "lora_targets": {
+                    "q_proj": True,
+                    "k_proj": True,
+                    "v_proj": True,
+                    "out_proj": True,
+                    "mlp_lin1": False,
+                    "mlp_lin2": False,
+                    "hypernet_mlp": False,
+                    "iou_head_mlp": False,
+                },
+            },
+        },
     },
 
     "dataset": {
-        "auto_split": True,
         "seed": 42,
         "use_cache": True,
         "sav": "sav.pth",
-        "val_size": 0.3,
+        "val_size": 0.2,
         "positive_points": 1,
         "negative_points": 0,
-        "use_center": True, # The first positive point is always the most significant for each mask
-        "snap_to_grid": True, # Align the center to the prediction grid used by the automatic predictor
+        "use_center": True,
+        "snap_to_grid": True,
     }
 }
 
-config_predict = {
+config_evaluation = {
+    "batch_size": 1,
+    "num_workers": 0,
+    "prompts": {
+        "use_boxes": False,
+        "use_points": True,
+        "use_masks": False,
+    },
+    "multimask_output": False,
+    "dataset": {
+        "seed": 42,
+        "use_cache": True,
+        "sav": "sav.pth",
+        "positive_points": 1,
+        "negative_points": 0,
+        "use_center": True,
+        "snap_to_grid": True,
+    }
+}
+
+config_inference = {
     "opacity": 0.9,
 }
 
-cfg_train = Box(config)
-cfg_train.update(Box(config_train))
+cfg_training = Box(config)
+cfg_training.update(Box(config_training))
 
-cfg_predict = Box(config)
-cfg_predict.update(Box(config_predict))
+cfg_evaluation = Box(config)
+cfg_evaluation.update(Box(config_evaluation))
+
+cfg_inference = Box(config)
+cfg_inference.update(Box(config_inference))

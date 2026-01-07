@@ -1,21 +1,13 @@
 # finestSAM
 
-This project was carried out as part of the thesis at the University of Cagliari by:
+**finestSAM** is a framework designed for fine-tuning the Segment-Anything Model (SAM) by MetaAI on custom datasets in COCO format.
 
+Developed by [`Marco Pilia`](https://github.com/Marchisceddu) and [`Simone Dessi`](https://github.com/Druimo).
 
-* [`Marco Pilia`](https://github.com/Marchisceddu)
-* [`Simone Dessi`](https://github.com/Druimo)
-
-The main goal is to perform fine-tuning of the Segment-Anything model by MetaAI on a custom dataset in COCO format, with the aim of providing an effective implementation for predictions using SAM's automatic predictor.
-The code utilizes the Fabric framework from Lightning AI to offer an efficient implementation of the model.
-
-> [!NOTE]
-> Currently, this project implements a **classic fine-tuning** approach.
-
-To read the full research conducted for solving the task, you can consult the thesis (in Italian) at [`link`](https://drive.google.com/file/d/1JJwgVJOXWdbUqyN0FSMuvoJxFhoqSF4g/view?usp=sharing)
+The project enables **Classic** and **LoRA** (Low-Rank Adaptation) fine-tuning strategies, aimed at enhancing specific domain segmentation while ensuring seamless compatibility with SAM's automatic predictor.
+Built on the **Lightning AI Fabric** framework, it ensures an efficient and scalable implementation.
 
 ## Dataset
-
 You can structure your dataset in two ways, depending on whether you want the script to automatically split it into training and validation sets or if you prefer to provide them manually.
 
 ### Option 1: Auto-Split
@@ -38,7 +30,10 @@ dataset/
 ├── train/
 │   ├── images/
 │   └── annotations.json
-└── val/
+├── val/
+│   ├── images/
+│   └── annotations.json
+└── test/
     ├── images/
     └── annotations.json
 ```
@@ -48,78 +43,102 @@ dataset/
 Here are the steps to follow:
 
 1. **Download the SAM model checkpoint**  
-   The instructions for downloading the SAM model checkpoint can be found in the [`finestSAM/sav/`](https://github.com/Marchisceddu/finestSAM/blob/main/finestSAM/sav/) directory.
+   The instructions for downloading the SAM model checkpoint can be found in the [`finestSAM/sav/`](https://github.com/WholeNow/finestSAM/blob/main/finestSAM/sav/) directory.
 
 2. **Install necessary dependencies:**
-
-    - Install dependencies using pip by running the following command from the project directory:
-      ```bash
-      pip install -r requirements.txt
-      ```
-
-    - Alternatively, you can create a Conda environment using the provided `environment.yaml` file:
-      ```bash
-      conda env create -f environment.yaml
-      ```
-
-This will ensure that all required packages and libraries are installed and ready for use.
+    To install the required dependencies, run the following command:
+    ```bash
+    pip install -r requirements.txt
+    ```
 
 ## Config
 
-The hyperparameters required for the model are specified in [`finestSAM/config.py`](https://github.com/Marchisceddu/finestSAM/blob/main/finestSAM/config.py).
+The hyperparameters required for the model are specified in [`finestSAM/config.py`](https://github.com/WholeNow/finestSAM/blob/main/finestSAM/config.py).
 
 <details>
 <summary> <b>Configuration Overview</b> </summary>
 
 ### **General**
-- `device`: Hardware to run the model ("auto", "gpu", "cpu").
-- `num_devices`: Number of devices or "auto".
-- `num_nodes`: Number of GPU nodes for distributed training.
-- `seed_device`: Seed for device reproducibility (or None).
-- `sav_dir`: Output folder for model saves.
-- `out_dir`: Output folder for predictions.
+- `device`: (String) The hardware to run on (`"cpu"`, `"cuda"`, `"mps"`, `"gpu"`, `"tpu"`, `"auto"`).
+- `num_devices`: (String/Int/List) Number of devices to train on (int), which GPUs to train on (list or str), or `"auto"`. The value applies per node.
+- `num_nodes`: (Int) Number of GPU nodes for distributed training.
+- `precision`: (String/Int) Controls the floating-point precision used during model training and inference.
+    - Accepted values: `64` (double), `32` (full), `16-mixed` (half precision AMP), `bf16-mixed` (bfloat16 AMP).  
+      *Other supported values:* `16`, `bf16`, `transformer-engine`, `transformer-engine-float16`, `16-true`, `bf16-true`, `32-true`, `64-true`.
+    - If `None`, defaults will be used based on the device.
+- `matmul_precision`: (String) Matrix multiplication precision for Tensor Cores (`"medium"`, `"high"`, `"highest"`).
+- `seed_device`: (Int) Seed for device reproducibility (or None).
+- `sav_dir`: (String) Output folder for model saves.
+- `out_dir`: (String) Output folder for predictions.
 - `model`:
-    - `type`: Model type ("vit_h", "vit_l", "vit_b").
-    - `checkpoint`: Path to the .pth checkpoint file.
+    - `type`: (String) Model type (`"vit_h"`, `"vit_l"`, `"vit_b"`).
+    - `checkpoint`: (String) Path to the .pth checkpoint file.
 
-### **Training**
-- `seed_dataloader`: Seed for dataloader reproducibility (or None).
-- `batch_size`: Batch size for images.
-- `num_workers`: Number of subprocesses for data loading.
-- `num_epochs`: Number of training epochs.
-- `eval_interval`: Interval (in epochs) for validation.
+### **Training** / **Evaluation**
+- `seed_dataloader`: (Int) Seed for dataloader reproducibility (or None).
+- `batch_size`: (Int) Batch size for images.
+- `num_workers`: (Int) Number of subprocesses for data loading.
+- `num_epochs`: (Int) Number of training epochs.
+- `eval_interval`: (Int) Interval (in epochs) for validation.
 - `prompts`:
-    - `use_boxes`: Use bounding boxes for training.
-    - `use_points`: Use points for training.
-    - `use_masks`: Use mask annotations for training.
-    - `use_logits`: Use logits from previous epoch.
+    - `use_boxes`: (Bool) Use bounding boxes for training.
+    - `use_points`: (Bool) Use points for training.
+    - `use_masks`: (Bool) Use mask annotations for training.
+    - `use_logits`: (Bool) Use logits from previous epoch.
 - `multimask_output`: (Bool) Enable multimask output.
 - `opt`:
-    - `learning_rate`: Learning rate.
-    - `weight_decay`: Weight decay.
+    - `learning_rate`: (Float) Learning rate.
+    - `weight_decay`: (Float) Weight decay.
 - `sched`:
-    - `type`: Scheduler type ("ReduceLROnPlateau" or "LambdaLR").
+    - `type`: (String) Scheduler type (`"ReduceLROnPlateau"` or `"LambdaLR"`).
     - `LambdaLR`:
-        - `decay_factor`: Learning rate decay factor.
-        - `steps`: List of steps for decay.
-        - `warmup_steps`: Number of warmup epochs.
+        - `decay_factor`: (Float) Learning rate decay factor.
+        - `steps`: (List[Int]) List of steps for decay.
+        - `warmup_steps`: (Int) Number of warmup epochs.
     - `ReduceLROnPlateau`:
-        - `decay_factor`: Learning rate decay factor.
-        - `epoch_patience`: Patience for LR decay.
-        - `threshold`: Threshold for measuring the new optimum.
-        - `cooldown`: Number of epochs to wait before resuming normal operation.
-        - `min_lr`: Minimum learning rate.
+        - `decay_factor`: (Float) Learning rate decay factor.
+        - `epoch_patience`: (Int) Patience for LR decay.
+        - `threshold`: (Float) Threshold for measuring the new optimum.
+        - `cooldown`: (Int) Number of epochs to wait before resuming normal operation.
+        - `min_lr`: (Float) Minimum learning rate.
 - `losses`:
-    - `focal_ratio`: Weight of focal loss.
-    - `dice_ratio`: Weight of dice loss.
-    - `iou_ratio`: Weight of IoU loss.
-    - `focal_alpha`: Alpha value for focal loss.
-    - `focal_gamma`: Gamma value for focal loss.
+    - `focal_ratio`: (Float) Weight of focal loss.
+    - `dice_ratio`: (Float) Weight of dice loss.
+    - `iou_ratio`: (Float) Weight of IoU loss.
+    - `focal_alpha`: (Float) Alpha value for focal loss.
+    - `focal_gamma`: (Float) Gamma value for focal loss.
 - `model_layer`:
     - `freeze`:
-        - `image_encoder`: Freeze image encoder.
-        - `prompt_encoder`: Freeze prompt encoder.
-        - `mask_decoder`: Freeze mask decoder.
+        - `image_encoder`: (Bool) Freeze image encoder.
+        - `prompt_encoder`: (Bool) Freeze prompt encoder.
+        - `mask_decoder`: (Bool) Freeze mask decoder.
+    - `LORA`:
+        - `encoder`:
+            - `enabled`: (Bool) Enable LoRA for the image encoder.
+            - `lora_r`: (Int) Rank of the LoRA matrices (0 to disable).
+            - `lora_alpha`: (Float) Scaling factor for LoRA weights (acts like a specific learning rate for adapters).
+            - `lora_dropout`: (Float) Dropout applied to LoRA input.
+            - `lora_bias`: (Bool) Enable bias in LoRA layers.
+            - `lora_targets`:
+                - `qkv`: (Bool) Apply to fused QKV projection.
+                - `proj`: (Bool) Apply to output projection.
+                - `mlp_lin1`: (Bool) Apply to the first linear layer of the MLP.
+                - `mlp_lin2`: (Bool) Apply to the second linear layer of the MLP.
+        - `decoder`:
+            - `enabled`: (Bool) Enable LoRA for the mask decoder.
+            - `lora_r`: (Int) Rank of the LoRA matrices (0 to disable).
+            - `lora_alpha`: (Float) Scaling factor for LoRA weights (acts like a specific learning rate for adapters).
+            - `lora_dropout`: (Float) Dropout applied to LoRA input.
+            - `lora_bias`: (Bool) Enable bias in LoRA layers.
+            - `lora_targets`:
+                - `q_proj`: (Bool) Apply to Query projection in attention.
+                - `k_proj`: (Bool) Apply to Key projection in attention.
+                - `v_proj`: (Bool) Apply to Value projection in attention.
+                - `out_proj`: (Bool) Apply to Output projection in attention.
+                - `mlp_lin1`: (Bool) Apply to first linear layer of MLPs.
+                - `mlp_lin2`: (Bool) Apply to second linear layer of MLPs.
+                - `hypernet_mlp`: (Bool) Apply to hypernetworks MLPs.
+                - `iou_head_mlp`: (Bool) Apply to IoU prediction head.
 
 ### **Dataset**
 - `auto_split`: (Bool) Automatically split dataset.
@@ -129,8 +148,8 @@ The hyperparameters required for the model are specified in [`finestSAM/config.p
 - `val_size`: (Float) Validation split percentage.
 - `positive_points`: Number of positive points per mask.
 - `negative_points`: Number of negative points per mask.
-- `use_center`: Use the mask center as a key point.
-- `snap_to_grid`: Align points to the automatic predictor grid.
+- `use_center`: (Bool) Use the mask center as a positive key point (most significant point).
+- `snap_to_grid`: (Bool) Align the center point to the prediction grid used by the automatic predictor.
 
 ### **Prediction**
 - `opacity`: Transparency of predicted masks (0.0 - 1.0).
@@ -139,10 +158,13 @@ The hyperparameters required for the model are specified in [`finestSAM/config.p
 
 ## Run model
 
-To execute the file [`finestSAM/__main__.py`](https://github.com/Marchisceddu/finestSAM/blob/main/finestSAM/__main__.py), use the following command-line arguments.
+To execute the file [`finestSAM/__main__.py`](https://github.com/WholeNow/finestSAM/blob/main/finestSAM/__main__.py), use the following command-line arguments.
 
 > [!TIP]
-> Check out the [`notebook.ipynb`](https://github.com/Marchisceddu/finestSAM/blob/main/notebook.ipynb) for the most up-to-date usage examples and easy experimentation.
+> Check out the provided notebooks for easy experimentation:
+> - [`train.ipynb`](notebooks/train.ipynb) for training
+> - [`test.ipynb`](notebooks/test.ipynb) for testing
+> - [`predict.ipynb`](notebooks/predict.ipynb) for predictions
 
 ### **Training the Model:**
 Run the training process by specifying the mode and the dataset path:
@@ -164,81 +186,30 @@ Optionally, modify the mask opacity (default 0.9):
 python -m finestSAM --mode "predict" --input "path/to/image.png" --opacity 0.8
 ```
 
-## Results
+You can also specify a custom checkpoint and model type:
+```bash
+python -m finestSAM --mode "predict" --input "path/to/image.png" --checkpoint "path/to/checkpoint.pth" --model_type "vit_b"
+```
 
-The fine-tuning of the model was carried out to perform efficient instance segmentation, specifically for generating polygons that delimit urban areas in PDFs. These PDFs represent urban planning tools that regulate land transformations, such as areas where specific building restrictions apply. 
+### **Testing:**
+To evaluate the model on a test dataset, use the `test` mode. You can optionally specify a checkpoint and the model type:
 
-For this task, a single prompt was used during training: __1 central point per mask aligned with the automatic predictor grid.__ This prompt proved to be the most effective for training and ensuring the proper functioning of SAM's automatic predictor.
+```bash
+python -m finestSAM --mode "test" --dataset "path/to/test_dataset"
+```
 
-### Test sam vit_b
-<details>
-
-<summary> Training progress </summary>
-
-![Train sam vit_b](assets/Test-vit_b/Test6.png)
- _Training progress for the sam_vit_b model_
-
-</details>
-
-<details>
-
-<summary> Comparison images </summary>
-
-![Test 6 - Comparison 1](assets/Test-vit_b/Test6_comparison_1.png)
- _`Original Image`_ , _`Ground Truth Masks`_ , _`SAM vit_b_ - _Masks`_ , _`Finetuning - Masks`_ 
-
-![Test 6 - Comparison 2](assets/Test-vit_b/Test6_comparison_2.png)
- _`Original Image`_ , _`Ground Truth Masks`_ , _`SAM vit_b_ - _Masks`_ , _`Finetuning - Masks`_ 
-
-![Test 6 - Comparison 3](assets/Test-vit_b/Test6_comparison_3.png)
- _`Original Image`_ , _`Ground Truth Masks`_ , _`SAM vit_b_ - _Masks`_ , _`Finetuning - Masks`_ 
-
-![Test 6 - Comparison 4](assets/Test-vit_b/Test6_comparison_4.png)
- _`Original Image`_ , _`Ground Truth Masks`_ , _`SAM vit_b_ - _Masks`_ , _`Finetuning - Masks`_ 
-
-</details>
-
-
-### Test sam vit_h
-<details>
-
-<summary> Training progress </summary>
-
-![Train sam vit_h](assets/Test-vit_h/Test8.png)
- _Training progress for the sam_vit_h model_
-
-</details>
-
-<details>
-
-<summary> Comparison images </summary>
-
-![Test 6 - Comparison 1](assets/Test-vit_h/Test8_comparison_1.png)
- _`Original Image`_ , _`Ground Truth Masks`_ , _`SAM vit_h_ - _Masks`_ , _`Finetuning - Masks`_ 
-
-![Test 6 - Comparison 2](assets/Test-vit_h/Test8_comparison_2.png)
- _`Original Image`_ , _`Ground Truth Masks`_ , _`SAM vit_h_ - _Masks`_ , _`Finetuning - Masks`_ 
-
-![Test 6 - Comparison 3](assets/Test-vit_h/Test8_comparison_3.png)
- _`Original Image`_ , _`Ground Truth Masks`_ , _`SAM vit_h_ - _Masks`_ , _`Finetuning - Masks`_ 
-
-![Test 6 - Comparison 4](assets/Test-vit_h/Test8_comparison_4.png)
- _`Original Image`_ , _`Ground Truth Masks`_ , _`SAM vit_h_ - _Masks`_ , _`Finetuning - Masks`_ 
-
-</details>
-
+With specific checkpoint and model type:
+```bash
+python -m finestSAM --mode "test" --dataset "path/to/test_dataset" --checkpoint "path/to/checkpoint.pth" --model_type "vit_b"
+```
 
 ## To-Do List
 
-- [ ] Added a function to create the bounding boxes for training (suggestion on line 175 [finestSAM/model/dataset.py](https://github.com/Marchisceddu/finestSAM/blob/main/finestSAM/model/dataset.py))
+- [ ] Added a function to create the bounding boxes for training (suggestion on line 258 [finestSAM/data/dataset.py](https://github.com/WholeNow/finestSAM/blob/main/finestSAM/data/dataset.py))
 
 - [ ] Validation method based on SAM automatic predictor
 
-- [ ] Test
-
-- [ ] tpu support
-
-- [ ] Adapter Lora fine-tuning method
+- [ ] TPU Support
 
 ## Resources
 
@@ -247,4 +218,4 @@ For this task, a single prompt was used during training: __1 central point per m
 - [lightning-sam](https://github.com/luca-medeiros/lightning-sam)
 
 ## License
-The model is licensed under the [Apache 2.0 license](https://github.com/Marchisceddu/finestSAM/blob/main/LICENSE.txt).
+The model is licensed under the [Apache 2.0 license](https://github.com/WholeNow/finestSAM/blob/main/LICENSE.txt).

@@ -8,25 +8,31 @@ from torch.utils.data import DataLoader
 from lightning.fabric.fabric import _FabricOptimizer
 from lightning.fabric.loggers import TensorBoardLogger
 import segmentation_models_pytorch as smp
-from .utils import (
-    Metrics,
-    validate,
-    print_and_log_metrics,
-    plot_history,
-    save,
-    save_train_metrics,
-    save_val_metrics
-)
-from .losses import (
+from finestSAM.core.losses import (
     DiceLoss,
     FocalLoss
 )
-from ..model import FinestSAM
-from .utils import configure_opt
-from ..dataset import load_dataset
+from finestSAM.utils import (
+    Metrics,
+    configure_opt,
+    validate,
+    print_and_log_metrics,
+    plot_history,
+    save_train_metrics,
+    save_val_metrics
+)
+from finestSAM.core.model import FinestSAM
+from finestSAM.data.dataset import load_dataset
 
 
 def call_train(cfg: Box, dataset_path: str):
+    """
+    Entry point for training the model.
+    
+    Args:
+        cfg (Box): The configuration file.
+        dataset_path (str): The path to the dataset.
+    """
     # Set up the output directory
     main_directory = os.path.dirname(os.path.abspath(__file__)).rsplit('/', 2)[0]
     cfg.sav_dir = os.path.join(main_directory, cfg.sav_dir)
@@ -37,13 +43,14 @@ def call_train(cfg: Box, dataset_path: str):
     fabric = L.Fabric(accelerator=cfg.device,
                       devices=cfg.num_devices,
                       strategy="auto",
-                      num_nodes=cfg.num_nodes, 
+                      num_nodes=cfg.num_nodes,
+                      precision=cfg.precision, 
                       loggers=loggers)
     
     fabric.launch(train, cfg, dataset_path)
 
 
-def train(fabric, *args, **kwargs):
+def train(fabric: L.Fabric, *args, **kwargs):
     """
     Main training function.
     
@@ -51,6 +58,7 @@ def train(fabric, *args, **kwargs):
         fabric (L.Fabric): The lightning fabric.
         *args: The positional arguments:
             [0] - cfg (Box): The configuration file.
+            [1] - dataset_path (str): The path to the dataset.
         **kwargs: The keyword arguments:
             not used.
     """
@@ -63,6 +71,9 @@ def train(fabric, *args, **kwargs):
     if fabric.global_rank == 0: 
         os.makedirs(os.path.join(cfg.sav_dir, "loggers_finestSAM"), exist_ok=True)
 
+    # Set matmul precision for Tensor Cores
+    torch.set_float32_matmul_precision(cfg.matmul_precision)
+
     with fabric.device:
         model = FinestSAM(cfg)
         model.setup()
@@ -70,12 +81,12 @@ def train(fabric, *args, **kwargs):
         model.to(fabric.device)
 
     # Load the dataset
-    train_data, val_data = load_dataset(cfg, model.model.image_encoder.img_size, dataset_path)
+    train_data, val_data = load_dataset(cfg, model.model.image_encoder.img_size, dataset_path, fabric=fabric)
     train_data = fabric._setup_dataloader(train_data)
     val_data = fabric._setup_dataloader(val_data)
 
     # Configure the optimizer and scheduler
-    optimizer, scheduler = configure_opt(cfg, model)
+    optimizer, scheduler = configure_opt(cfg, model, fabric)
     model, optimizer = fabric.setup(model, optimizer)
 
     train_loop(cfg, fabric, model, optimizer, scheduler, train_data, val_data) 
@@ -100,9 +111,6 @@ def train_loop(
     # calc_iou = CalcIoU()
     # calc_dsc = CalcDSC()
 
-    if cfg.prompts.use_logits: cfg.prompts.use_masks = False
-    epoch_logits = []
-
     last_lr = scheduler.get_last_lr()
     best_val_iou = 0.
     best_val_dsc = 0.
@@ -126,7 +134,8 @@ def train_loop(
     val_iou, val_dsc = 0., 0.
     if cfg.eval_interval > 0:
         val_iou, val_dsc = validate(fabric, cfg, model, val_dataloader, 0)
-        save_val_metrics(0, val_iou, val_dsc, cfg.out_dir)
+        if fabric.global_rank == 0:
+            save_val_metrics(0, val_iou, val_dsc, cfg.out_dir)
 
     for epoch in range(1, cfg.num_epochs+1):
         # Initialize the meters
@@ -137,17 +146,13 @@ def train_loop(
             torch.cuda.empty_cache()
             epoch_metrics.data_time.update(time.time()-end)
 
-            if epoch > 1 and cfg.prompts.use_logits: [data.update({"mask_inputs": logits.clone().detach().unsqueeze(1)}) for data, logits in zip(batched_data, epoch_logits)]
-
-            outputs = model(batched_input=batched_data, multimask_output=cfg.multimask_output, are_logits=cfg.prompts.use_logits)
+            outputs = model(batched_input=batched_data, multimask_output=cfg.multimask_output)
 
             batched_pred_masks = []
             batched_iou_predictions = []
-            batched_logits = []
             for item in outputs:
                 batched_pred_masks.append(item["masks"])
                 batched_iou_predictions.append(item["iou_predictions"])
-                batched_logits.append(item["low_res_logits"])
 
             batch_size = len(batched_data)
 
@@ -161,23 +166,18 @@ def train_loop(
             }
 
             # Compute the losses
-            for data, pred_masks, iou_predictions, logits in zip(batched_data, batched_pred_masks, batched_iou_predictions, batched_logits):
+            for data, pred_masks, iou_predictions in zip(batched_data, batched_pred_masks, batched_iou_predictions):
 
                 if cfg.multimask_output:
                     separated_masks = torch.unbind(pred_masks, dim=1)
                     separated_scores = torch.unbind(iou_predictions, dim=1)
-                    separated_logits = torch.unbind(logits, dim=1)
 
                     best_index = torch.argmax(torch.tensor([torch.mean(score) for score in separated_scores]))
                     pred_masks = separated_masks[best_index]
                     iou_predictions = separated_scores[best_index]
-                    logits = separated_logits[best_index]
                 else:
                     pred_masks = pred_masks.squeeze(1)
                     iou_predictions = iou_predictions.squeeze(1)
-                    logits = logits.squeeze(1)
-
-                if cfg.prompts.use_logits: epoch_logits.append(logits)
 
                 batch_stats = smp.metrics.get_stats(
                     pred_masks,
@@ -199,8 +199,8 @@ def train_loop(
                 iter_metrics["iou_pred"] += batch_iou_predictions
 
                 # Calculate the losses
-                iter_metrics["loss_focal"] += focal_loss(pred_masks, data["gt_masks"], len(pred_masks)) 
-                iter_metrics["loss_dice"] += dice_loss(pred_masks, data["gt_masks"], len(pred_masks))
+                iter_metrics["loss_focal"] += focal_loss(pred_masks, data["gt_masks"].float(), len(pred_masks)) 
+                iter_metrics["loss_dice"] += dice_loss(pred_masks, data["gt_masks"].float(), len(pred_masks))
                 iter_metrics["loss_iou"] += F.mse_loss(batch_iou_predictions, batch_iou, reduction='mean')
 
             loss_total = cfg.losses.focal_ratio * iter_metrics["loss_focal"] + cfg.losses.dice_ratio * iter_metrics["loss_dice"] + cfg.losses.iou_ratio * iter_metrics["loss_iou"]
@@ -225,7 +225,10 @@ def train_loop(
             print_and_log_metrics(fabric, cfg, epoch, iter, epoch_metrics, train_dataloader)
 
         # Step the scheduler
-        scheduler.step(epoch_metrics.total_losses.avg)
+        if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
+            scheduler.step(epoch_metrics.total_losses.avg)
+        else:
+            scheduler.step()
         if scheduler.get_last_lr() != last_lr:
             last_lr = scheduler.get_last_lr()
             fabric.print(f"learning rate changed to: {last_lr}")
@@ -244,7 +247,7 @@ def train_loop(
                 
                 ckpt_name = f"best_iou_epoch_{epoch}_val_{val_iou:.4f}"
                 best_iou_ckpt_path = os.path.join(cfg.sav_dir, ckpt_name + ".pth")
-                save(fabric, model, cfg.sav_dir, ckpt_name)
+                model.save(fabric, cfg.sav_dir, ckpt_name)
                 fabric.print(f"New best IoU model saved: {ckpt_name}.pth")
 
             if val_dsc > best_val_dsc:
@@ -257,10 +260,11 @@ def train_loop(
                 
                 ckpt_name = f"best_dsc_epoch_{epoch}_val_{val_dsc:.4f}"
                 best_dsc_ckpt_path = os.path.join(cfg.sav_dir, ckpt_name + ".pth")
-                save(fabric, model, cfg.sav_dir, ckpt_name)
+                model.save(fabric, cfg.sav_dir, ckpt_name)
                 fabric.print(f"New best DSC model saved: {ckpt_name}.pth")
             
-            save_val_metrics(epoch, val_iou, val_dsc, cfg.out_dir)
+            if fabric.global_rank == 0:
+                save_val_metrics(epoch, val_iou, val_dsc, cfg.out_dir)
 
         metrics_history["epochs"].append(epoch)
         metrics_history["total_loss"].append(epoch_metrics.total_losses.avg)
@@ -272,5 +276,6 @@ def train_loop(
         metrics_history["val_iou"].append(val_iou)
         metrics_history["val_dsc"].append(val_dsc)
 
-        plot_history(metrics_history, cfg.out_dir)
-        save_train_metrics(metrics_history, cfg.out_dir)
+        if fabric.global_rank == 0:
+            plot_history(metrics_history, cfg.out_dir)
+            save_train_metrics(metrics_history, cfg.out_dir)
