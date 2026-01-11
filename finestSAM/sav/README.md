@@ -2,7 +2,7 @@
 
 Three versions of the model are available with different base sizes.
 
-These models can be instantiated by modifying the `model.type` parameter within the [config](https://github.com/WholeNow/finestSAM/blob/main/finestSAM/config.py) file.
+These models can be instantiated by modifying the `model.type` parameter within the [config](https://github.com/WholeNow/MSSegSAM/blob/main/finestSAM/config.py) file.
 
 Click on the following links to download the checkpoint for the corresponding model type:
 

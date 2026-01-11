@@ -2,7 +2,7 @@ import os
 import torch
 import lightning as L
 from box import Box
-from finestSAM.core.model import FinestSAM
+from finestSAM.model.model import FinestSAM
 from finestSAM.data.dataset import load_test_dataset
 from finestSAM.utils import validate
 

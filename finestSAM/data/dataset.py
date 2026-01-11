@@ -14,8 +14,8 @@ from torch.utils.data import (
     DataLoader,
     random_split
 )
-from finestSAM.core.segment_anything.utils.transforms import ResizeLongestSide
-from finestSAM.core.segment_anything.utils.amg import build_point_grid
+from finestSAM.model.segment_anything.utils.transforms import ResizeLongestSide
+from finestSAM.model.segment_anything.utils.amg import build_point_grid
 
 
 class ValidAnn(TypedDict):

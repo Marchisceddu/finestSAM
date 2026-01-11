@@ -120,7 +120,10 @@ The hyperparameters required for the model are specified in [`finestSAM/config.p
             - `lora_dropout`: (Float) Dropout applied to LoRA input.
             - `lora_bias`: (Bool) Enable bias in LoRA layers.
             - `lora_targets`:
-                - `qkv`: (Bool) Apply to fused QKV projection.
+                - `q_proj`: (Bool) Apply to Query projection in attention.
+                - `k_proj`: (Bool) Apply to Key projection in attention.
+                - `v_proj`: (Bool) Apply to Value projection in attention.
+                - `out_proj`: (Bool) Apply to Output projection in attention.
                 - `proj`: (Bool) Apply to output projection.
                 - `mlp_lin1`: (Bool) Apply to the first linear layer of the MLP.
                 - `mlp_lin2`: (Bool) Apply to the second linear layer of the MLP.

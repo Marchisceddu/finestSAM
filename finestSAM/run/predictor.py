@@ -7,7 +7,7 @@ from box import Box
 from finestSAM.utils import (
     show_anns,
 )
-from finestSAM.core.model import FinestSAM
+from finestSAM.model.model import FinestSAM
 
 
 def call_predict(cfg: Box, input_path: str, opacity: float = 0.9, checkpoint_path: str = None, model_type: str = None):
@@ -33,11 +33,9 @@ def call_predict(cfg: Box, input_path: str, opacity: float = 0.9, checkpoint_pat
 
     if opacity is not None:
         cfg.opacity = opacity
-    # Get the paths
-    main_directory = os.path.dirname(os.path.abspath(__file__)).rsplit('/', 2)[0]
-    cfg.sav_dir = os.path.join(main_directory, cfg.sav_dir)
-    cfg.out_dir = os.path.join(main_directory, cfg.out_dir)
-    image_path = os.path.join(main_directory, input_path)
+
+    # Get the image path
+    image_path = input_path
 
     # Get the image
     image = cv2.imread(image_path)

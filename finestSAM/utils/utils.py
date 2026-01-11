@@ -1,6 +1,7 @@
 import os
 import sys
 import math
+import time
 import torch
 import numpy as np
 import lightning as L
@@ -10,7 +11,7 @@ from box import Box
 from typing import Tuple, Dict, Union, Optional, Any
 from torch.utils.data import DataLoader
 from lightning.fabric.fabric import _FabricOptimizer
-from finestSAM.core.model import FinestSAM
+from finestSAM.model.model import FinestSAM
 
 
 class AverageMeter:
@@ -61,6 +62,55 @@ class Metrics:
         self.dsc = AverageMeter()
 
 
+class WarmupReduceLROnPlateau:
+    def __init__(self, optimizer, warmup_steps, patience, factor, threshold, cooldown, min_lr):
+        self.warmup_steps = warmup_steps
+        self.optimizer = optimizer
+        self.step_num = 0
+        
+        self.warmup_scheduler = torch.optim.lr_scheduler.LambdaLR(
+            optimizer, 
+            lr_lambda=lambda step: float(step) / float(max(1, warmup_steps))
+        )
+        
+        self.plateau_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer, 
+            mode='min', 
+            factor=factor, 
+            patience=patience, 
+            threshold=threshold, 
+            cooldown=cooldown, 
+            min_lr=min_lr
+        )
+
+    def step(self, metrics=None):
+        if metrics is None:
+            if self.step_num < self.warmup_steps:
+                self.warmup_scheduler.step()
+            self.step_num += 1
+        else:
+            if self.step_num >= self.warmup_steps:
+                self.plateau_scheduler.step(metrics)
+
+    def state_dict(self):
+        return {
+            'step_num': self.step_num,
+            'warmup_scheduler': self.warmup_scheduler.state_dict(),
+            'plateau_scheduler': self.plateau_scheduler.state_dict(),
+        }
+
+    def load_state_dict(self, state_dict):
+        self.step_num = state_dict['step_num']
+        self.warmup_scheduler.load_state_dict(state_dict['warmup_scheduler'])
+        self.plateau_scheduler.load_state_dict(state_dict['plateau_scheduler'])
+        
+    def get_last_lr(self):
+        if self.step_num < self.warmup_steps:
+            return self.warmup_scheduler.get_last_lr()
+        # ReduceLROnPlateau doesn't support get_last_lr in all versions, fallback
+        return [param_group['lr'] for param_group in self.optimizer.param_groups]
+
+
 def configure_opt(cfg: Box, model: FinestSAM, fabric: L.Fabric) -> Tuple[_FabricOptimizer, _FabricOptimizer]:
 
     def lr_lambda(step):
@@ -85,15 +135,29 @@ def configure_opt(cfg: Box, model: FinestSAM, fabric: L.Fabric) -> Tuple[_Fabric
     all_params = sum(p.numel() for p in model.model.parameters())
     trainable_params = sum(p.numel() for p in trainable)
     fabric.print(f"Trainable: {trainable_params:,} ({100 * trainable_params / all_params:.4f}%) | Total: {all_params:,}")
+    log_event(cfg.out_dir, f"Trainable: {trainable_params:,} ({100 * trainable_params / all_params:.4f}%) | Total: {all_params:,}")
 
     # Configure scheduler
     if cfg.sched.type == "ReduceLROnPlateau":
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, 
-                                                               factor=cfg.sched.ReduceLROnPlateau.decay_factor, 
-                                                               patience=cfg.sched.ReduceLROnPlateau.epoch_patience, 
-                                                               threshold=cfg.sched.ReduceLROnPlateau.threshold, 
-                                                               cooldown=cfg.sched.ReduceLROnPlateau.cooldown,
-                                                               min_lr=cfg.sched.ReduceLROnPlateau.min_lr)
+        if cfg.sched.ReduceLROnPlateau.get("warmup_steps", 0) > 0:
+            scheduler = WarmupReduceLROnPlateau(
+                optimizer=optimizer,
+                warmup_steps=cfg.sched.ReduceLROnPlateau.warmup_steps,
+                patience=cfg.sched.ReduceLROnPlateau.epoch_patience,
+                factor=cfg.sched.ReduceLROnPlateau.decay_factor,
+                threshold=cfg.sched.ReduceLROnPlateau.threshold,
+                cooldown=cfg.sched.ReduceLROnPlateau.cooldown,
+                min_lr=cfg.sched.ReduceLROnPlateau.min_lr
+            )
+        else:
+            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+                optimizer=optimizer, 
+                factor=cfg.sched.ReduceLROnPlateau.decay_factor, 
+                patience=cfg.sched.ReduceLROnPlateau.epoch_patience, 
+                threshold=cfg.sched.ReduceLROnPlateau.threshold, 
+                cooldown=cfg.sched.ReduceLROnPlateau.cooldown,
+                min_lr=cfg.sched.ReduceLROnPlateau.min_lr
+            )
     else:
         scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
     
@@ -473,6 +537,22 @@ def _write_metrics_file(out_dir, filename, headers, values):
         f.write("\t".join(formatted_values) + "\n")
 
 
+def log_event(out_dir: str, message: str, filename: str = "training_events.txt"):
+    """
+    Logs an event message with a timestamp to a text file.
+
+    Args:
+        out_dir (str): Directory where the log file is saved.
+        message (str): The message to log.
+        filename (str): The name of the log file (default: "training_events.txt").
+    """
+    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+    log_path = os.path.join(out_dir, filename)
+    
+    with open(log_path, "a") as f:
+        f.write(f"[{timestamp}] {message}\n")   
+
+
 def show_anns(
         anns: list, 
         opacity: float = 0.35
@@ -528,4 +608,4 @@ def show_points(coords, labels, ax, marker_size=375):
 def show_box(box, ax):
     x0, y0 = box[0], box[1]
     w, h = box[2] - box[0], box[3] - box[1]
-    ax.add_patch(plt.Rectangle((x0, y0), w, h, edgecolor='green', facecolor=(0,0,0,0), lw=2))   
+    ax.add_patch(plt.Rectangle((x0, y0), w, h, edgecolor='green', facecolor=(0,0,0,0), lw=2))

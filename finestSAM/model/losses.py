@@ -78,9 +78,6 @@ class FocalLoss(nn.Module):
         return loss.mean(1).sum() / num_masks
     
 
-# Metrics 
-# (now in the code are used segmentation_models_pytorch library, but we can use these implementations if needed)
-
 class CalcIoU(nn.Module):
 
     def __init__(self, smooth: int = 1e-7):
@@ -91,7 +88,7 @@ class CalcIoU(nn.Module):
         """
         Compute the Intersection over Union (IoU) loss.
         Args:
-            pred_mask: A float tensor of arbitrary shape.
+            pred_mask: A float logits tensor of arbitrary shape.
                     The predictions for each example.
             gt_mask: A float tensor with the same shape as inputs. Stores the binary
                     classification label for each element in inputs
@@ -119,7 +116,7 @@ class CalcDSC(nn.Module):
         """
         Compute the Dice score.
         Args:
-            inputs: A float tensor of arbitrary shape.
+            inputs: A float logits tensor of arbitrary shape.
                     The predictions for each example.
             targets: A float tensor with the same shape as inputs. Stores the binary
                     classification label for each element in inputs

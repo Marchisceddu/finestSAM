@@ -7,21 +7,24 @@ from box import Box
 from torch.utils.data import DataLoader
 from lightning.fabric.fabric import _FabricOptimizer
 from lightning.fabric.loggers import TensorBoardLogger
-import segmentation_models_pytorch as smp
-from finestSAM.core.losses import (
+from finestSAM.model.losses import (
     DiceLoss,
-    FocalLoss
+    FocalLoss,
+    CalcIoU,
+    CalcDSC
 )
 from finestSAM.utils import (
     Metrics,
+    WarmupReduceLROnPlateau,
     configure_opt,
     validate,
     print_and_log_metrics,
     plot_history,
     save_train_metrics,
-    save_val_metrics
+    save_val_metrics,
+    log_event
 )
-from finestSAM.core.model import FinestSAM
+from finestSAM.model.model import FinestSAM
 from finestSAM.data.dataset import load_dataset
 
 
@@ -33,11 +36,6 @@ def call_train(cfg: Box, dataset_path: str):
         cfg (Box): The configuration file.
         dataset_path (str): The path to the dataset.
     """
-    # Set up the output directory
-    main_directory = os.path.dirname(os.path.abspath(__file__)).rsplit('/', 2)[0]
-    cfg.sav_dir = os.path.join(main_directory, cfg.sav_dir)
-    cfg.out_dir = os.path.join(main_directory, cfg.out_dir)
-
     loggers = [TensorBoardLogger(cfg.sav_dir, name="loggers_finestSAM")]
 
     fabric = L.Fabric(accelerator=cfg.device,
@@ -46,7 +44,7 @@ def call_train(cfg: Box, dataset_path: str):
                       num_nodes=cfg.num_nodes,
                       precision=cfg.precision, 
                       loggers=loggers)
-    
+
     fabric.launch(train, cfg, dataset_path)
 
 
@@ -107,9 +105,8 @@ def train_loop(
     # Initialize the losses
     focal_loss = FocalLoss(gamma=cfg.losses.focal_gamma, alpha=cfg.losses.focal_alpha)
     dice_loss = DiceLoss()
-    # uncommented this lines if you want use them instead of smp.metrics
-    # calc_iou = CalcIoU()
-    # calc_dsc = CalcDSC()
+    calc_iou = CalcIoU()
+    calc_dsc = CalcDSC()
 
     last_lr = scheduler.get_last_lr()
     best_val_iou = 0.
@@ -179,29 +176,18 @@ def train_loop(
                     pred_masks = pred_masks.squeeze(1)
                     iou_predictions = iou_predictions.squeeze(1)
 
-                batch_stats = smp.metrics.get_stats(
-                    pred_masks,
-                    data["gt_masks"].int(),
-                    mode='binary',
-                    threshold=0.5,
-                )
-
                 # Update the metrics
-                batch_iou = smp.metrics.iou_score(*batch_stats, reduction="micro-imagewise")
-                batch_dsc = smp.metrics.f1_score(*batch_stats, reduction="micro-imagewise")
-                # uncommented these lines if you want use them instead of smp.metrics
-                # batch_iou = calc_iou(pred_masks, data["gt_masks"])
-                # batch_dsc = calc_dsc(pred_masks, data["gt_masks"])
-                batch_iou_predictions = torch.mean(iou_predictions)
+                batch_iou = calc_iou(pred_masks, data["gt_masks"])
+                batch_dsc = calc_dsc(pred_masks, data["gt_masks"])
                 
-                iter_metrics["iou"] += batch_iou
-                iter_metrics["dsc"] += batch_dsc
-                iter_metrics["iou_pred"] += batch_iou_predictions
+                iter_metrics["iou"] += torch.mean(batch_iou)
+                iter_metrics["dsc"] += torch.mean(batch_dsc)
+                iter_metrics["iou_pred"] += torch.mean(iou_predictions)
 
                 # Calculate the losses
                 iter_metrics["loss_focal"] += focal_loss(pred_masks, data["gt_masks"].float(), len(pred_masks)) 
                 iter_metrics["loss_dice"] += dice_loss(pred_masks, data["gt_masks"].float(), len(pred_masks))
-                iter_metrics["loss_iou"] += F.mse_loss(batch_iou_predictions, batch_iou, reduction='mean')
+                iter_metrics["loss_iou"] += F.mse_loss(iou_predictions, batch_iou, reduction='mean')
 
             loss_total = cfg.losses.focal_ratio * iter_metrics["loss_focal"] + cfg.losses.dice_ratio * iter_metrics["loss_dice"] + cfg.losses.iou_ratio * iter_metrics["loss_iou"]
 
@@ -209,6 +195,14 @@ def train_loop(
             optimizer.zero_grad()
             fabric.backward(loss_total)
             optimizer.step()
+
+            # Step the scheduler if it's LambdaLR or WarmupReduceLROnPlateau
+            if isinstance(scheduler, (torch.optim.lr_scheduler.LambdaLR, WarmupReduceLROnPlateau)):
+                scheduler.step()
+                if scheduler.get_last_lr() != last_lr:
+                    last_lr = scheduler.get_last_lr()
+                    fabric.print(f"learning rate changed to: {last_lr}")
+                    log_event(cfg.out_dir, f"Epoch {epoch} | Iter {iter}: Learning rate changed to {last_lr}")
 
             epoch_metrics.batch_time.update(time.time() - end)
             end = time.time()
@@ -224,14 +218,13 @@ def train_loop(
 
             print_and_log_metrics(fabric, cfg, epoch, iter, epoch_metrics, train_dataloader)
 
-        # Step the scheduler
-        if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
+        # Step the scheduler if it is ReduceLROnPlateau or WarmupReduceLROnPlateau
+        if isinstance(scheduler, (torch.optim.lr_scheduler.ReduceLROnPlateau, WarmupReduceLROnPlateau)):
             scheduler.step(epoch_metrics.total_losses.avg)
-        else:
-            scheduler.step()
-        if scheduler.get_last_lr() != last_lr:
-            last_lr = scheduler.get_last_lr()
-            fabric.print(f"learning rate changed to: {last_lr}")
+            if scheduler.get_last_lr() != last_lr:
+                last_lr = scheduler.get_last_lr()
+                fabric.print(f"learning rate changed to: {last_lr}")
+                log_event(cfg.out_dir, f"Epoch {epoch}: Learning rate changed to {last_lr}")
 
         if (cfg.eval_interval > 0 and epoch % cfg.eval_interval == 0) or (epoch == cfg.num_epochs):
             
@@ -249,6 +242,7 @@ def train_loop(
                 best_iou_ckpt_path = os.path.join(cfg.sav_dir, ckpt_name + ".pth")
                 model.save(fabric, cfg.sav_dir, ckpt_name)
                 fabric.print(f"New best IoU model saved: {ckpt_name}.pth")
+                log_event(cfg.out_dir, f"Epoch {epoch}: New best IoU model saved: {ckpt_name}.pth (IoU: {val_iou:.4f})")
 
             if val_dsc > best_val_dsc:
                 best_val_dsc = val_dsc
@@ -262,6 +256,7 @@ def train_loop(
                 best_dsc_ckpt_path = os.path.join(cfg.sav_dir, ckpt_name + ".pth")
                 model.save(fabric, cfg.sav_dir, ckpt_name)
                 fabric.print(f"New best DSC model saved: {ckpt_name}.pth")
+                log_event(cfg.out_dir, f"Epoch {epoch}: New best DSC model saved: {ckpt_name}.pth (DSC: {val_dsc:.4f})")
             
             if fabric.global_rank == 0:
                 save_val_metrics(epoch, val_iou, val_dsc, cfg.out_dir)

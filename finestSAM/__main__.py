@@ -1,7 +1,12 @@
 import argparse
-from finestSAM.engine.trainer import call_train
-from finestSAM.engine.predictor import call_predict
-from finestSAM.engine.evaluator import call_test
+import sys
+import os
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from finestSAM.run.trainer import call_train
+from finestSAM.run.predictor import call_predict
+from finestSAM.run.evaluator import call_test
 
 if __name__ == "__main__":
     # Parse the arguments
