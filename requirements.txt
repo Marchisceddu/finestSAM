@@ -2,6 +2,8 @@ lightning
 matplotlib
 numpy
 opencv-python
+nibabel
+tqdm
 pillow
 pycocotools
 python-box
@@ -11,5 +13,6 @@ shapely
 scipy
 torch
 torchvision
-tqdm
 tensorboard
+wget
+monai

@@ -1,3 +1,8 @@
+"""
+Deprecated, now we use monai for losses and metrics.
+"""
+
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

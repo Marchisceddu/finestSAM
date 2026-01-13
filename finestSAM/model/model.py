@@ -20,14 +20,52 @@ class FinestSAM(nn.Module):
         """Set up the model."""
         checkpoint = os.path.join(self.cfg.sav_dir, self.cfg.model.checkpoint)
 
+        img_size = self.cfg.model.get("img_size", 1024)
+        pixel_mean = self.cfg.model.get("pixel_mean", None)
+        pixel_std = self.cfg.model.get("pixel_std", None)
+
         try:
-            self.model = sam_model_registry[self.cfg.model.type](checkpoint=checkpoint)
+            self.model = sam_model_registry[self.cfg.model.type](
+                checkpoint=checkpoint, 
+                image_size=img_size,
+                pixel_mean=pixel_mean,
+                pixel_std=pixel_std
+            )
+            
+            self._apply_freezing()
+    
+            lora_cfg = getattr(self.cfg.model_layer, "LORA", None)
+            if lora_cfg:
+              self.model = inject_lora_sam(self.model, lora_cfg=lora_cfg)
+
         except (RuntimeError, FileNotFoundError, KeyError) as e:
-            if isinstance(e, RuntimeError) and ("Error(s) in loading state_dict" in str(e) or "size mismatch" in str(e)):
+            is_runtime_error_size_mismatch = isinstance(e, RuntimeError) and ("Error(s) in loading state_dict" in str(e) or "size mismatch" in str(e))
+            
+            lora_cfg = getattr(self.cfg.model_layer, "LORA", None)
+            if is_runtime_error_size_mismatch and lora_cfg:
+                try:
+                    # Lora checkpoint loading
+                    self.model = sam_model_registry[self.cfg.model.type](
+                        checkpoint=None, 
+                        image_size=img_size,
+                        pixel_mean=pixel_mean,
+                        pixel_std=pixel_std
+                    )
+                    
+                    self._apply_freezing()
+                    self.model = inject_lora_sam(self.model, lora_cfg=lora_cfg)
+                    
+                    state_dict = torch.load(checkpoint, map_location='cpu')
+                    self.model.load_state_dict(state_dict)
+                    
+                    return
+                except Exception as e:
+                    print(f"ERROR: {e}")
+
+            if is_runtime_error_size_mismatch:
                  raise RuntimeError(
                     f"\n\nERROR: Failed to load checkpoint '{self.cfg.model.checkpoint}' for model type '{self.cfg.model.type}'.\n"
                     "Please ensure that the checkpoint corresponds to the selected model type.\n"
-                    "You can specify the correct model type in the configuration file or via arguments."
                 ) from e
             elif isinstance(e, FileNotFoundError):
                  raise FileNotFoundError(
@@ -41,21 +79,6 @@ class FinestSAM(nn.Module):
                 ) from e
             else:
                 raise e
-          
-        if torch.is_grad_enabled():
-            if self.cfg.model_layer.freeze.image_encoder:
-                for param in self.model.image_encoder.parameters():
-                    param.requires_grad = False
-            if self.cfg.model_layer.freeze.prompt_encoder:
-                for param in self.model.prompt_encoder.parameters():
-                    param.requires_grad = False
-            if self.cfg.model_layer.freeze.mask_decoder:
-                for param in self.model.mask_decoder.parameters():
-                    param.requires_grad = False
-
-            lora_cfg = getattr(self.cfg.model_layer, "LORA", None)
-            if lora_cfg:
-              self.model = inject_lora_sam(self.model, lora_cfg=lora_cfg)
 
     def forward(
         self,
@@ -73,7 +96,7 @@ class FinestSAM(nn.Module):
             excluded if it is not present.
               'image': The image as a torch tensor in 3xHxW format,
                 already transformed for input to the model (dtype: torch.float32).
-                (H or W must have the minimum size of self.model.image_encoder.img_size)
+                (H and W must have the maximum size of self.model.image_encoder.img_size)
               'original_size': (tuple(int, int)) The original size of
                 the image before transformation, as (H, W).
               'point_coords': (torch.Tensor) Batched point prompts for
@@ -85,7 +108,7 @@ class FinestSAM(nn.Module):
                 Already transformed to the input frame of the model.
               'mask_inputs': (torch.Tensor) Batched mask inputs to the model,
                 in the form Bx1xHxW (dtype: torch.uint8).
-                (must be 1/4 the size of the image post-transformation, so self.model.image_encoder.img_size//4)
+                (The largest dimension must be at most 1/4 of the largest dimension of the input image)
           multimask_output (bool): Whether the model should predict multiple
             disambiguating masks, or return a single mask.
 
@@ -149,11 +172,24 @@ class FinestSAM(nn.Module):
     def _pad(self, x: torch.Tensor) -> torch.Tensor:
         """Pad to a square input."""
         h, w = x.shape[-2:]
-        img_size = max(h, w) 
-        padh = img_size - h
-        padw = img_size - w
+
+        padh = self.model.image_encoder.img_size // 4 - h
+        padw = self.model.image_encoder.img_size // 4 - w
         x = F.pad(x, (0, padw, 0, padh))
         return x
+
+    def _apply_freezing(self):
+        """Apply freezing to model layers based on configuration."""
+        if torch.is_grad_enabled():
+            if self.cfg.model_layer.freeze.image_encoder:
+                for param in self.model.image_encoder.parameters():
+                    param.requires_grad = False
+            if self.cfg.model_layer.freeze.prompt_encoder:
+                for param in self.model.prompt_encoder.parameters():
+                    param.requires_grad = False
+            if self.cfg.model_layer.freeze.mask_decoder:
+                for param in self.model.mask_decoder.parameters():
+                    param.requires_grad = False
     
     def get_predictor(self):
         return SamPredictor(self.model)

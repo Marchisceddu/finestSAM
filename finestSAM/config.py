@@ -16,64 +16,23 @@ config = {
     "model": {
         "type": 'vit_b',
         "checkpoint": "sam_vit_b_01ec64.pth",
-    },
-}
-
-config_training = {
-    "seed_dataloader": None,
-    "batch_size": 1,
-    "num_workers": 0,
-
-    "num_epochs": 150,
-    "eval_interval": 3,
-    "prompts": {
-        "use_boxes": False,
-        "use_points": True,
-        "use_masks": False,
-    },
-    "multimask_output": False,
-
-    "opt": {
-        "learning_rate": 1e-4,
-        "weight_decay": 1e-4,
-    },
-
-    "sched": {
-        "type": "ReduceLROnPlateau",
-        "LambdaLR": {
-            "decay_factor": 10, # 1 / (cfg.sched.LambdaLR.decay_factor ** (mul_factor+1))
-            "steps": None,
-            "warmup_steps": 0,
-        },
-        "ReduceLROnPlateau": {
-            "decay_factor": 0.05, # lr * factor -> 8e-4 * 0.1 = 8e-5
-            "epoch_patience": 3,
-            "threshold": 1e-4,
-            "cooldown": 0,
-            "min_lr": 0,
-            "warmup_steps": 250,
-        },
-    },
-
-    "losses": {
-        "focal_ratio": 20.,
-        "dice_ratio": 1.,
-        "iou_ratio": 1.,
-        "focal_alpha": 0.8,
-        "focal_gamma": 2,
+        "img_size": 512,
+        "compute_stats": True,
+        "pixel_mean": None,
+        "pixel_std": None, 
     },
 
     "model_layer": {
         "freeze": {
             "image_encoder": True,
-            "prompt_encoder": True,
+            "prompt_encoder": False,
             "mask_decoder": False,
         },
         "LORA": {
             "encoder": {
                 "enabled": True,
-                "lora_r": 4,
-                "lora_alpha": 4,
+                "lora_r": 16,
+                "lora_alpha": 16,
                 "lora_dropout": 0,
                 "lora_bias": False,
                 "lora_targets": {
@@ -103,6 +62,68 @@ config_training = {
                 },
             },
         },
+    },
+}
+
+config_training = {
+    "seed_dataloader": None,
+    "batch_size": 8,
+    "num_workers": 0,
+
+    "num_epochs": 150,
+    "eval_interval": 1,
+    "prompts": {
+        "use_boxes": True,
+        "use_points": False,
+        "use_masks": False,
+    },
+    "multimask_output": False,
+
+    "opt": {
+        "learning_rate": 1e-4,
+        "weight_decay": 1e-4, 
+    },
+
+    "sched": {
+        "type": "ReduceLROnPlateau",
+        "LambdaLR": {
+            "decay_factor": 10, # 1 / (cfg.sched.LambdaLR.decay_factor ** (mul_factor+1))
+            "steps": None,
+            "warmup_steps": 0,
+        },
+        "ReduceLROnPlateau": {
+            "decay_factor": 0.05, # lr * factor -> 8e-4 * 0.1 = 8e-5
+            "epoch_patience": 3,
+            "threshold": 1e-4,
+            "cooldown": 0,
+            "min_lr": 0,
+            "warmup_steps": 250,
+        },
+    },
+
+    "losses": {
+        "focal": {
+            "enabled": False,
+            "weight": 20.0,
+            "gamma": 2.0,
+        },
+        "dice": {
+            "enabled": True,
+            "weight": 1.0,
+        },
+        "iou": {
+            "enabled": True, 
+            "weight": 1.0,
+        },
+        "cross_entropy": {
+            "enabled": True, 
+            "weight": 1.0,
+        },
+    },
+    
+    "metrics": {
+        "iou": {"enabled": True},
+        "dice": {"enabled": True},
     },
 
     "dataset": {

@@ -10,7 +10,7 @@ from finestSAM.utils import (
 from finestSAM.model.model import FinestSAM
 
 
-def call_predict(cfg: Box, input_path: str, opacity: float = 0.9, checkpoint_path: str = None, model_type: str = None):
+def call_predict(cfg: Box, input_path: str, opacity: float = None, checkpoint_path: str = None, model_type: str = None):
     """
     Perform automatic predictions on an input image.
     
@@ -41,24 +41,23 @@ def call_predict(cfg: Box, input_path: str, opacity: float = 0.9, checkpoint_pat
     image = cv2.imread(image_path)
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-    # Load the model 
-    with torch.no_grad():
-        fabric = L.Fabric(accelerator=cfg.device, #  "tpu" is not supported in this version
-                      devices=1,
-                      strategy="auto")
-        
-        fabric.seed_everything(cfg.seed_device)
+    # Load the model
+    fabric = L.Fabric(accelerator=cfg.device,
+                  devices=1,
+                  strategy="auto")
+    
+    fabric.seed_everything(cfg.seed_device)
 
-        with fabric.device:
-            model = FinestSAM(cfg)
-            model.setup()
-            model.eval()
-            model.to(fabric.device)
+    with fabric.device:
+        model = FinestSAM(cfg)
+        model.setup()
+        model.eval()
+        model.to(fabric.device)
 
-        # Predict the masks
-        predictor = model.get_automatic_predictor()
-        masks = predictor.generate(image)
-           
+    # Predict the masks
+    predictor = model.get_automatic_predictor()
+    masks = predictor.generate(image)
+
     # Create the output directory if it does not exist
     os.makedirs(cfg.out_dir, exist_ok=True)
 
@@ -66,7 +65,7 @@ def call_predict(cfg: Box, input_path: str, opacity: float = 0.9, checkpoint_pat
     fig, ax = plt.subplots(figsize=(6.4, 6.4), dpi=100)  # 6.4 inches * 100 dpi = 640 pixels
     ax.set_position([0, 0, 1, 1])  # [left, bottom, width, height]
     plt.imshow(image)
-    show_anns(masks, opacity=opacity)
+    show_anns(masks, opacity=cfg.opacity)
     plt.axis('off')
     plt.savefig(os.path.join(cfg.out_dir, "output.png"), dpi=100, bbox_inches='tight', pad_inches=0)
     plt.show()

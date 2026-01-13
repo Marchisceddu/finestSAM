@@ -256,10 +256,26 @@ class COCODataset(Dataset):
             x, y, w, h = meta['bbox']
 
             # Add random noise to each coordinate with standard deviation equal to 10% of the box sidelength, to a maximum of 20 pixels
-            ''' 
-            Add the code here
-            if the code is not present, the box is considered as the original one
-            '''
+            x1_prompt, y1_prompt = float(x), float(y)
+            x2_prompt, y2_prompt = float(x + w), float(y + h)
+
+            side_len = float(max(w, h))
+            sigma = min(0.1 * side_len, 20.0)
+            if sigma > 0:
+                dx1, dy1, dx2, dy2 = np.random.normal(loc=0.0, scale=sigma, size=(4,))
+                x1_noisy = x1_prompt + float(dx1)
+                y1_noisy = y1_prompt + float(dy1)
+                x2_noisy = x2_prompt + float(dx2)
+                y2_noisy = y2_prompt + float(dy2)
+
+                x1_noisy = float(np.clip(x1_noisy, 0.0, float(W - 1)))
+                y1_noisy = float(np.clip(y1_noisy, 0.0, float(H - 1)))
+                x2_noisy = float(np.clip(x2_noisy, 0.0, float(W - 1)))
+                y2_noisy = float(np.clip(y2_noisy, 0.0, float(H - 1)))
+
+                # Ensure box is valid; otherwise fall back to the original box.
+                if (x2_noisy - x1_noisy) >= 1.0 and (y2_noisy - y1_noisy) >= 1.0:
+                    x1_prompt, y1_prompt, x2_prompt, y2_prompt = x1_noisy, y1_noisy, x2_noisy, y2_noisy
         
             # Generate the mask
             mask = self.coco.annToMask(ann)
@@ -293,7 +309,7 @@ class COCODataset(Dataset):
 
             # Append to batch lists
             masks.append(mask)
-            boxes.append([x, y, x + w, y + h])
+            boxes.append([x1_prompt, y1_prompt, x2_prompt, y2_prompt])
             point_coords.append(sample_points_1 + sample_points_0)
             point_labels.append(labels_1 + labels_0)
     

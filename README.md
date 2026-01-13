@@ -1,11 +1,18 @@
 # finestSAM
 
-**finestSAM** is a framework designed for fine-tuning the Segment-Anything Model (SAM) by MetaAI on custom datasets in COCO format.
+**finestSAM** is a configuration-driven framework for fine-tuning Meta AI's Segment Anything Model (SAM) on custom datasets in COCO format.
 
 Developed by [`Marco Pilia`](https://github.com/Marchisceddu) and [`Simone Dessi`](https://github.com/Druimo).
 
-The project enables **Classic** and **LoRA** (Low-Rank Adaptation) fine-tuning strategies, aimed at enhancing specific domain segmentation while ensuring seamless compatibility with SAM's automatic predictor.
-Built on the **Lightning AI Fabric** framework, it ensures an efficient and scalable implementation.
+The goal is to make SAM fine-tuning reproducible and highly controllable, letting you decide (via [`finestSAM/config.py`](https://github.com/WholeNow/finestSAM/blob/main/finestSAM/config.py)) small but important details such as:
+
+- Training strategy: classic fine-tuning or LoRA adapters (encoder and/or decoder), with selectable target submodules.
+- What prompts drive supervision: boxes / points / masks (train and evaluation can differ).
+- Which SAM components are frozen (image encoder / prompt encoder / mask decoder).
+- Optimization knobs: losses and metrics toggles, schedulers, precision, and device selection (including `auto`).
+- Data handling: dataset split/caching options and optional dataset-driven normalization statistics.
+
+Built on **Lightning AI Fabric**, it is designed to scale cleanly from local runs to multi-device training while keeping compatibility with SAM inference and automatic prediction workflows.
 
 ## Dataset
 You can structure your dataset in two ways, depending on whether you want the script to automatically split it into training and validation sets or if you prefer to provide them manually.
@@ -73,6 +80,10 @@ The hyperparameters required for the model are specified in [`finestSAM/config.p
 - `model`:
     - `type`: (String) Model type (`"vit_h"`, `"vit_l"`, `"vit_b"`).
     - `checkpoint`: (String) Path to the .pth checkpoint file.
+    - `img_size`: (Int) Input image size for the model (default `512`).
+    - `compute_stats`: (Bool) If `True`, automatically compute `pixel_mean` and `pixel_std` from the training dataset.
+    - `pixel_mean`: (List[Float]) Mean values for image normalization. If `None`, defaults to ImageNet mean.
+    - `pixel_std`: (List[Float]) Standard deviation values for image normalization. If `None`, defaults to ImageNet std.
 
 ### **Training** / **Evaluation**
 - `seed_dataloader`: (Int) Seed for dataloader reproducibility (or None).
@@ -82,9 +93,10 @@ The hyperparameters required for the model are specified in [`finestSAM/config.p
 - `eval_interval`: (Int) Interval (in epochs) for validation.
 - `prompts`:
     - `use_boxes`: (Bool) Use bounding boxes for training.
+    - Notes: The box is randomly expanded/contracted by jittering its coordinates; the jitter scale is computed as 10% of the box side length and capped at a maximum of 20 pixels.
     - `use_points`: (Bool) Use points for training.
     - `use_masks`: (Bool) Use mask annotations for training.
-    - `use_logits`: (Bool) Use logits from previous epoch.
+
 - `multimask_output`: (Bool) Enable multimask output.
 - `opt`:
     - `learning_rate`: (Float) Learning rate.
@@ -101,12 +113,26 @@ The hyperparameters required for the model are specified in [`finestSAM/config.p
         - `threshold`: (Float) Threshold for measuring the new optimum.
         - `cooldown`: (Int) Number of epochs to wait before resuming normal operation.
         - `min_lr`: (Float) Minimum learning rate.
+        - `warmup_steps`: (Int) Number of warmup epochs.
 - `losses`:
-    - `focal_ratio`: (Float) Weight of focal loss.
-    - `dice_ratio`: (Float) Weight of dice loss.
-    - `iou_ratio`: (Float) Weight of IoU loss.
-    - `focal_alpha`: (Float) Alpha value for focal loss.
-    - `focal_gamma`: (Float) Gamma value for focal loss.
+    - `focal`:
+        - `enabled`: (Bool) Enable focal loss.
+        - `weight`: (Float) Weight of focal loss.
+        - `gamma`: (Float) Gamma value for focal loss.
+    - `dice`:
+        - `enabled`: (Bool) Enable dice loss.
+        - `weight`: (Float) Weight of dice loss.
+    - `iou`:
+        - `enabled`: (Bool) Enable IoU loss.
+        - `weight`: (Float) Weight of IoU loss.
+    - `cross_entropy`:
+        - `enabled`: (Bool) Enable Cross Entropy loss.
+        - `weight`: (Float) Weight of Cross Entropy loss.
+- `metrics`:
+    - `iou`:
+        - `enabled`: (Bool) Enable IoU metric.
+    - `dice`:
+        - `enabled`: (Bool) Enable Dice Score metric.
 - `model_layer`:
     - `freeze`:
         - `image_encoder`: (Bool) Freeze image encoder.
@@ -124,7 +150,6 @@ The hyperparameters required for the model are specified in [`finestSAM/config.p
                 - `k_proj`: (Bool) Apply to Key projection in attention.
                 - `v_proj`: (Bool) Apply to Value projection in attention.
                 - `out_proj`: (Bool) Apply to Output projection in attention.
-                - `proj`: (Bool) Apply to output projection.
                 - `mlp_lin1`: (Bool) Apply to the first linear layer of the MLP.
                 - `mlp_lin2`: (Bool) Apply to the second linear layer of the MLP.
         - `decoder`:
@@ -144,7 +169,6 @@ The hyperparameters required for the model are specified in [`finestSAM/config.p
                 - `iou_head_mlp`: (Bool) Apply to IoU prediction head.
 
 ### **Dataset**
-- `auto_split`: (Bool) Automatically split dataset.
 - `seed`: Seed for dataset operations.
 - `use_cache`: (Bool) Use cached dataset metadata.
 - `sav`: Filename for saving dataset cache.
@@ -208,11 +232,10 @@ python -m finestSAM --mode "test" --dataset "path/to/test_dataset" --checkpoint 
 
 ## To-Do List
 
-- [ ] Added a function to create the bounding boxes for training (suggestion on line 258 [finestSAM/data/dataset.py](https://github.com/WholeNow/finestSAM/blob/main/finestSAM/data/dataset.py))
-
-- [ ] Validation method based on SAM automatic predictor
-
-- [ ] TPU Support
+- [ ] Improve the evaluation methods.
+- [ ] Adding Gradient Accumulation support.
+- [ ] Add support for more SAM variants.
+- [ ] Implement additional data augmentation techniques.
 
 ## Resources
 
