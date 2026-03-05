@@ -31,8 +31,8 @@ config = {
         "LORA": {
             "encoder": {
                 "enabled": True,
-                "lora_r": 16,
-                "lora_alpha": 16,
+                "lora_r": 4,
+                "lora_alpha": 4,
                 "lora_dropout": 0,
                 "lora_bias": False,
                 "lora_targets": {
@@ -40,15 +40,15 @@ config = {
                     "k_proj": False,
                     "v_proj": True,
                     "out_proj": False,
-                    "mlp_lin1": False,
-                    "mlp_lin2": False,
+                    "mlp_lin1": True,
+                    "mlp_lin2": True,
                 },
             },
             "decoder": {
                 "enabled": False,
                 "lora_r": 4,
                 "lora_alpha": 4,
-                "lora_dropout": 0.1,
+                "lora_dropout": 0,
                 "lora_bias": False,
                 "lora_targets": {
                     "q_proj": False,
@@ -66,12 +66,13 @@ config = {
 }
 
 config_training = {
-    "seed_dataloader": None,
     "batch_size": 8,
     "num_workers": 0,
 
-    "num_epochs": 150,
+    "num_epochs": 30,
     "eval_interval": 1,
+    "val_at_epoch_0": False,
+    "print_images": 0,
     "prompts": {
         "use_boxes": True,
         "use_points": False,
@@ -80,7 +81,7 @@ config_training = {
     "multimask_output": False,
 
     "opt": {
-        "learning_rate": 1e-4,
+        "learning_rate": 4e-5,
         "weight_decay": 1e-4, 
     },
 
@@ -92,11 +93,12 @@ config_training = {
             "warmup_steps": 0,
         },
         "ReduceLROnPlateau": {
-            "decay_factor": 0.05, # lr * factor -> 8e-4 * 0.1 = 8e-5
+            "monitor": "val_loss", # "train_loss" or "val_loss"
+            "decay_factor": 0.1, # lr * factor -> 8e-4 * 0.1 = 8e-5
             "epoch_patience": 3,
-            "threshold": 1e-4,
-            "cooldown": 0,
-            "min_lr": 0,
+            "threshold": 1e-3,
+            "cooldown": 3,
+            "min_lr": 1e-7,
             "warmup_steps": 250,
         },
     },
@@ -124,6 +126,7 @@ config_training = {
     "metrics": {
         "iou": {"enabled": True},
         "dice": {"enabled": True},
+        "hd95": {"enabled": True},
     },
 
     "dataset": {
@@ -141,12 +144,39 @@ config_training = {
 config_evaluation = {
     "batch_size": 1,
     "num_workers": 0,
+    "print_images": "all",
     "prompts": {
-        "use_boxes": False,
-        "use_points": True,
+        "use_boxes": True,
+        "use_points": False,
         "use_masks": False,
     },
     "multimask_output": False,
+
+    "losses": {
+        "focal": {
+            "enabled": False,
+            "weight": 20.0,
+            "gamma": 2.0,
+        },
+        "dice": {
+            "enabled": True,
+            "weight": 1.0,
+        },
+        "iou": {
+            "enabled": True, 
+            "weight": 1.0,
+        },
+        "cross_entropy": {
+            "enabled": True, 
+            "weight": 1.0,
+        },
+    },
+    "metrics": {
+        "iou": {"enabled": True},
+        "dice": {"enabled": True},
+        "hd95": {"enabled": True},
+    },
+
     "dataset": {
         "seed": 42,
         "use_cache": True,
@@ -155,11 +185,7 @@ config_evaluation = {
         "negative_points": 0,
         "use_center": True,
         "snap_to_grid": True,
-    }
-}
-
-config_inference = {
-    "opacity": 0.9,
+    },
 }
 
 cfg_training = Box(config)
@@ -167,6 +193,3 @@ cfg_training.update(Box(config_training))
 
 cfg_evaluation = Box(config)
 cfg_evaluation.update(Box(config_evaluation))
-
-cfg_inference = Box(config)
-cfg_inference.update(Box(config_inference))

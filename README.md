@@ -86,11 +86,15 @@ The hyperparameters required for the model are specified in [`finestSAM/config.p
     - `pixel_std`: (List[Float]) Standard deviation values for image normalization. If `None`, defaults to ImageNet std.
 
 ### **Training** / **Evaluation**
-- `seed_dataloader`: (Int) Seed for dataloader reproducibility (or None).
 - `batch_size`: (Int) Batch size for images.
 - `num_workers`: (Int) Number of subprocesses for data loading.
 - `num_epochs`: (Int) Number of training epochs.
 - `eval_interval`: (Int) Interval (in epochs) for validation.
+- `val_at_epoch_0`: (Bool) If `True`, runs a validation pass once before training starts (epoch 0). Only applies when `eval_interval > 0`.
+- `print_images`: (Int/String) Controls saving qualitative validation outputs.
+    - `0`: disables saving.
+    - Positive integer `N`: saves up to `N` validation batches (uniformly sampled) under `out_dir/images/`.
+    - `"all"`: saves every validation batch under `out_dir/images/`.
 - `prompts`:
     - `use_boxes`: (Bool) Use bounding boxes for training.
     - Notes: The box is randomly expanded/contracted by jittering its coordinates; the jitter scale is computed as 10% of the box side length and capped at a maximum of 20 pixels.
@@ -108,6 +112,7 @@ The hyperparameters required for the model are specified in [`finestSAM/config.p
         - `steps`: (List[Int]) List of steps for decay.
         - `warmup_steps`: (Int) Number of warmup epochs.
     - `ReduceLROnPlateau`:
+        - `monitor`: (String) Which signal drives LR scheduling (`"train_loss"` or `"val_loss"`). When set to `"val_loss"`, the scheduler is stepped only on validation epochs.
         - `decay_factor`: (Float) Learning rate decay factor.
         - `epoch_patience`: (Int) Patience for LR decay.
         - `threshold`: (Float) Threshold for measuring the new optimum.
@@ -133,6 +138,8 @@ The hyperparameters required for the model are specified in [`finestSAM/config.p
         - `enabled`: (Bool) Enable IoU metric.
     - `dice`:
         - `enabled`: (Bool) Enable Dice Score metric.
+    - `hd95`:
+        - `enabled`: (Bool) Enable 95th percentile Hausdorff distance metric (HD95).
 - `model_layer`:
     - `freeze`:
         - `image_encoder`: (Bool) Freeze image encoder.
@@ -191,7 +198,6 @@ To execute the file [`finestSAM/__main__.py`](https://github.com/WholeNow/finest
 > Check out the provided notebooks for easy experimentation:
 > - [`train.ipynb`](notebooks/train.ipynb) for training
 > - [`test.ipynb`](notebooks/test.ipynb) for testing
-> - [`predict.ipynb`](notebooks/predict.ipynb) for predictions
 
 ### **Training the Model:**
 Run the training process by specifying the mode and the dataset path:
@@ -200,26 +206,8 @@ Run the training process by specifying the mode and the dataset path:
 python -m finestSAM --mode "train" --dataset "path/to/dataset"
 ```
 
-### **Automatic Predictions:**
-For making predictions, specify the input image path:
-
-```bash
-python -m finestSAM --mode "predict" --input "path/to/image.png"
-```
-
-Optionally, modify the mask opacity (default 0.9):
-
-```bash
-python -m finestSAM --mode "predict" --input "path/to/image.png" --opacity 0.8
-```
-
-You can also specify a custom checkpoint and model type:
-```bash
-python -m finestSAM --mode "predict" --input "path/to/image.png" --checkpoint "path/to/checkpoint.pth" --model_type "vit_b"
-```
-
 ### **Testing:**
-To evaluate the model on a test dataset, use the `test` mode. You can optionally specify a checkpoint and the model type:
+To evaluate the model on a test dataset, use the `test` mode. You can optionally specify a checkpoint, the model type, and how many qualitative samples to save:
 
 ```bash
 python -m finestSAM --mode "test" --dataset "path/to/test_dataset"
@@ -227,15 +215,13 @@ python -m finestSAM --mode "test" --dataset "path/to/test_dataset"
 
 With specific checkpoint and model type:
 ```bash
-python -m finestSAM --mode "test" --dataset "path/to/test_dataset" --checkpoint "path/to/checkpoint.pth" --model_type "vit_b"
+python -m finestSAM --mode "test" --dataset "path/to/test_dataset" --checkpoint "path/to/checkpoint.pth" --model_type "vit_b" --output_images "all"
 ```
 
 ## To-Do List
 
-- [ ] Improve the evaluation methods.
 - [ ] Adding Gradient Accumulation support.
 - [ ] Add support for more SAM variants.
-- [ ] Implement additional data augmentation techniques.
 
 ## Resources
 

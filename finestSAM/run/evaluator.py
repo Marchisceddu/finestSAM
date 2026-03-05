@@ -4,10 +4,10 @@ import lightning as L
 from box import Box
 from finestSAM.model.model import FinestSAM
 from finestSAM.data.dataset import load_test_dataset
-from finestSAM.utils import validate
+from finestSAM.utils import validate, seed_everything, save_metrics
 
 
-def call_test(cfg: Box, dataset_path: str, checkpoint_path: str = None, model_type: str = None):
+def call_test(cfg: Box, dataset_path: str, checkpoint_path: str = None, model_type: str = None, output_images: str = None):
     """
     Evaluate the model on a test dataset.
     
@@ -17,6 +17,7 @@ def call_test(cfg: Box, dataset_path: str, checkpoint_path: str = None, model_ty
         checkpoint_path (str, optional): Path to the checkpoint file. 
                                          If None, uses the one in cfg.
         model_type (str, optional): The type of the model (vit_b, vit_l, vit_h).
+        output_images (str, optional): Number of qualitative samples to save in the out folder. Can be "all", 0, or an integer.
     """
     
     if checkpoint_path:
@@ -24,14 +25,19 @@ def call_test(cfg: Box, dataset_path: str, checkpoint_path: str = None, model_ty
     
     if model_type:
         cfg.model.type = model_type
+    
+    if output_images:
+        cfg.print_images = output_images
         
     print(f"Loading checkpoint from: {cfg.model.checkpoint}")
     print(f"Model type: {cfg.model.type}")
 
-    fabric = L.Fabric(accelerator=cfg.device,
-                      devices=cfg.num_devices,
-                      strategy="auto")
-    
+    fabric = L.Fabric(
+        accelerator=cfg.device,
+        devices=cfg.num_devices,
+        strategy="auto",
+        precision=cfg.precision
+    )
     fabric.launch(test, cfg, dataset_path)
 
 
@@ -44,13 +50,12 @@ def test(fabric: L.Fabric, *args, **kwargs):
         *args: The positional arguments:
             [0] - cfg (Box): The configuration file.
             [1] - dataset_path (str): The path to the test dataset.
-        **kwargs: The keyword arguments:
-            not used.
     """
     cfg = args[0]
     dataset_path = args[1]
     
-    fabric.seed_everything(cfg.seed_device)
+    seed_everything(fabric, cfg.seed_device, deterministic=True)
+    torch.set_float32_matmul_precision(cfg.matmul_precision)
 
     with fabric.device:
         model = FinestSAM(cfg)
@@ -64,8 +69,23 @@ def test(fabric: L.Fabric, *args, **kwargs):
 
     fabric.print(f"Starting testing on dataset: {dataset_path}")
     
-    mean_iou, mean_dsc = validate(fabric, cfg, model, test_dataloader, epoch=0)
+    results = validate(
+        fabric,
+        cfg,
+        model,
+        test_dataloader,
+        epoch=0
+    )
 
     fabric.print("\nTest Results:")
-    fabric.print(f"Mean IoU: {mean_iou:.4f}")
-    fabric.print(f"Mean DSC: {mean_dsc:.4f}")
+    if "iou" in results:
+        fabric.print(f"Mean IoU: {results['iou']:.4f}")
+    if "dsc" in results:
+        fabric.print(f"Mean DSC: {results['dsc']:.4f}")
+    if "hd95" in results:
+        fabric.print(f"Mean HD95: {results['hd95']:.4f}")
+    if "total_loss" in results:
+        fabric.print(f"Total Loss: {results['total_loss']:.4f}")
+
+    if fabric.global_rank == 0:
+        save_metrics(split="test", results=results, out_dir=cfg.out_dir)
